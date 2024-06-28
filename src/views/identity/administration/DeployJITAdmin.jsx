@@ -9,7 +9,11 @@ import {
   RFFCFormSwitch,
   RFFSelectSearch,
 } from 'src/components/forms'
-import { useLazyGenericGetRequestQuery, useLazyGenericPostRequestQuery } from 'src/store/api/app'
+import {
+  useGenericGetRequestQuery,
+  useLazyGenericGetRequestQuery,
+  useLazyGenericPostRequestQuery,
+} from 'src/store/api/app'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCircleNotch, faEdit, faEye } from '@fortawesome/free-solid-svg-icons'
 import { CippContentCard, CippPage, CippPageList } from 'src/components/layout'
@@ -63,7 +67,17 @@ const DeployJITAdmin = () => {
     data: users = [],
     isFetching: usersIsFetching,
     error: usersError,
-  } = useListUsersQuery({ tenantDomain })
+  } = useGenericGetRequestQuery({
+    path: '/api/ListGraphRequest',
+    params: {
+      TenantFilter: tenantDomain,
+      Endpoint: 'users',
+      $select: 'id,displayName,userPrincipalName,accountEnabled',
+      $count: true,
+      $top: 999,
+      $orderby: 'displayName',
+    },
+  })
 
   return (
     <CippPage title={`Add JIT Admin`} tenantSelector={false}>
@@ -130,7 +144,7 @@ const DeployJITAdmin = () => {
                           <CCol>
                             <RFFSelectSearch
                               label={'Users in ' + tenantDomain}
-                              values={users?.map((user) => ({
+                              values={users?.Results?.map((user) => ({
                                 value: user.id,
                                 name: `${user.displayName} <${user.userPrincipalName}>`,
                               }))}
@@ -140,7 +154,7 @@ const DeployJITAdmin = () => {
                             />
                             <FormSpy subscription={{ values: true }}>
                               {({ values }) => {
-                                return users.map((user, key) => {
+                                return users?.Results?.map((user, key) => {
                                   if (
                                     user.id === values?.UserId?.value &&
                                     user.accountEnabled === false
