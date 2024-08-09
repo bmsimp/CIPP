@@ -10,5 +10,5 @@ rules:
     upstream: KelvinTegelaar:website
     mergeMethod: merge
   - base: docs
-    upstream: KelvinTegelarr:docs
+    upstream: KelvinTegelaar:docs
     mergeMethod: merge
