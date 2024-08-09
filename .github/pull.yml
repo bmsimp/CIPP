@@ -9,3 +9,6 @@ rules:
   - base: website
     upstream: KelvinTegelaar:website
     mergeMethod: merge
+  - base: docs
+    upstream: KelvinTegelarr:docs
+    mergeMethod: merge
