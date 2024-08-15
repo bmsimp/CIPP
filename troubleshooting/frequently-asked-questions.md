@@ -2,8 +2,6 @@
 
 On this page you can find a list of frequently asked questions about the CyberDrain Improved Partner Portal (CIPP). If you're having specific issues with CIPP please also check the Troubleshooting page.
 
-
-
 <details>
 
 <summary>How much does CIPP cost to run?</summary>
@@ -89,7 +87,7 @@ Complete all checks for effective troubleshooting. If you still have issues or f
 
 <summary>I'm getting missing permissions errors when performing the Permissions Check on my CIPP-SAM application. How can I fix this?</summary>
 
-Sometimes when you are running a permissions check, you may encounter specific errors that you are missing some of the API permissions required for CIPP to perform as expected.&#x20;
+Sometimes when you are running a permissions check, you may encounter specific errors that you are missing some of the API permissions required for CIPP to perform as expected.
 
 To ensure full functionality of CIPP, follow these steps to add the necessary API permissions:
 
@@ -179,6 +177,14 @@ For more details, refer to the [permissions setup guide](https://docs.cipp.app/s
 
 <details>
 
+<summary>Does CIPP require a specific license?</summary>
+
+No, CIPP can work with any M365 license, for specific features CIPP will of course the tenant to be licensed correctly; e.g. to manage Intune, the tenant must have Intune Licensing.
+
+</details>
+
+<details>
+
 <summary>My usernames or sites are GUIDs or blank?</summary>
 
 Please see the standard "Enable Usernames instead of pseudo anonymized names in reports" [here](https://docs.cipp.app/user-documentation/tenant/standards/edit-standards#meet-the-standards)
@@ -189,7 +195,7 @@ Please see the standard "Enable Usernames instead of pseudo anonymized names in 
 
 <summary>Why can't I install CIPP using the "Deploy to Azure" button?</summary>
 
-If you're experiencing issues with installation please report these in `#cipp-issues` on the [CIPP Discord](https://discord.gg/cyberdrain)
+If you're experiencing issues with installation please report these in `#cipp-community-help` on the [CIPP Discord](https://discord.gg/cyberdrain)
 
 </details>
 
@@ -265,7 +271,7 @@ To find the SAM App that CIPP is currently using, follow these steps:
 
 <summary>Helpdesk asked me to generate a HAR file in Google Chrome. How do I do that?</summary>
 
-#### To generate a HAR file while performing an action, follow these steps:
+**To generate a HAR file while performing an action, follow these steps:**
 
 1. **Open Chrome DevTools:**
    * Right-click in the browser window or tab.
@@ -277,20 +283,6 @@ To find the SAM App that CIPP is currently using, follow these steps:
    * Name the file and click **Save**.
 
 For more details, refer to the [Chrome DevTools guide](https://developers.google.com/web/tools/chrome-devtools/).
-
-</details>
-
-<details>
-
-<summary>How do I invite a user in CIPP?</summary>
-
-To invite a user, follow these steps:
-
-1. Go to the [CIPP Management Portal](https://management.cipp.app/).
-2. Ensure the UPN matches exactly with the user that is logged in.
-3. The Management Portal returns a link. Distribute this link to the correct user.
-
-For more details, refer to the [roles setup guide](https://docs.cipp.app/setup/installation/roles).
 
 </details>
 
