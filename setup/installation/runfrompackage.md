@@ -1,7 +1,3 @@
----
-description: Enable Run From Package for lower costs
----
-
 # Run From Package Mode
 
 {% hint style="info" %}
@@ -9,8 +5,6 @@ description: Enable Run From Package for lower costs
 
 If you choose to sponsor and use the CyberDrain hosted version, you can skip this step.&#x20;
 {% endhint %}
-
-In the CIPP Application
 
 1. Go to the Azure portal and find your resource group. Click on the Function App
 2. Click on **Function app Configuration** or `Settings` **-> Environment Variables** depending on your version of the Azure Portal.
