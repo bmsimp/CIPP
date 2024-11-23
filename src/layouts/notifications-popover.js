@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import BellIcon from "@heroicons/react/24/outline/BellIcon";
 import SparklesIcon from "@heroicons/react/24/outline/SparklesIcon";
 import {
@@ -17,6 +16,7 @@ import { Error, Update, Close as CloseIcon } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import { closeToast } from "../store/toasts";
 import { useState } from "react";
+import ReactTimeAgo from "react-time-ago";
 
 const getContent = (notification) => {
   return (
@@ -60,7 +60,7 @@ export const NotificationsPopover = () => {
   const notifications = toasts.map((toast) => {
     return {
       id: toast.index, // Ensure that 'id' corresponds to the identifier used in your store
-      type: toast.toastError?.type || "info",
+      type: toast.toastError?.type || "error",
       subtitle: toast.title,
       content: toast.message,
       createdAt: toast.date,
@@ -125,7 +125,7 @@ export const NotificationsPopover = () => {
           }}
         >
           {notificationsToShow.map((notification) => {
-            const createdAt = format(new Date(notification.createdAt), "MMM dd, yyyy");
+            const createdAt = <ReactTimeAgo date={notification.createdAt} />;
 
             return (
               <Stack key={notification.id} spacing={1} sx={{ p: 2 }}>

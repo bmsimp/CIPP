@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Grid, Button, IconButton, Tooltip, Collapse, Box, Typography } from "@mui/material";
+import {
+  Grid,
+  Button,
+  IconButton,
+  Tooltip,
+  Collapse,
+  Box,
+  Typography,
+  Divider,
+} from "@mui/material";
 import {
   Save as SaveIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   Delete,
   CalendarMonthTwoTone,
+  CopyAll,
+  KeyboardOptionKeyTwoTone,
 } from "@mui/icons-material";
 import { useForm, useWatch } from "react-hook-form";
 import { debounce, set } from "lodash";
@@ -18,12 +29,32 @@ import { CippFormCondition } from "../CippComponents/CippFormCondition";
 import { CippOffCanvas } from "../CippComponents/CippOffCanvas";
 import { CippCodeBlock } from "../CippComponents/CippCodeBlock";
 import CippSchedulerForm from "../CippFormPages/CippSchedulerForm";
+import defaultPresets from "../../data/GraphExplorerPresets";
+import { lighten, darken, styled } from "@mui/system";
+
+
+const GroupHeader = styled("div")(({ theme }) => ({
+  position: "sticky",
+  top: "-8px",
+  padding: "4px 10px",
+  color: theme.palette.primary.main,
+  backgroundColor: lighten(theme.palette.primary.light, 0.85),
+  ...theme.applyStyles("dark", {
+    backgroundColor: darken(theme.palette.primary.main, 0.8),
+  }),
+}));
+
+const GroupItems = styled("ul")({
+  padding: 0,
+});
 
 const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
   const [offCanvasOpen, setOffCanvasOpen] = useState(false);
   const [cardExpanded, setCardExpanded] = useState(true);
   const [offCanvasContent, setOffCanvasContent] = useState(null);
   const [selectedPresetState, setSelectedPreset] = useState(null);
+  const [presetOwner, setPresetOwner] = useState(false);
+  const [presetOptions, setPresetOptions] = useState([]);
   const formControl = useForm({
     mode: "onChange",
     defaultValues: {
@@ -34,6 +65,7 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
       ReverseTenantLookupProperty: "tenantId",
       $count: false,
       manualPagination: false,
+      IsShared: false,
     },
   });
 
@@ -53,6 +85,35 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
     },
     waiting: false,
   });
+
+  // API call for available presets
+  const presetList = ApiGetCall({
+    url: "/api/ListGraphExplorerPresets",
+    queryKey: "ListGraphExplorerPresets",
+  });
+
+  useEffect(() => {
+    var presetOptionList = [];
+    defaultPresets.forEach((item) => {
+      presetOptionList.push({
+        label: item.name,
+        value: item.id,
+        addedFields: item,
+        type: "Built-In",
+      });
+    });
+    if (presetList.isSuccess && presetList.data?.Results.length > 0) {
+      presetList.data.Results.forEach((item) => {
+        presetOptionList.push({
+          label: item.name,
+          value: item.id,
+          addedFields: item,
+          type: "Custom",
+        });
+      });
+    }
+    setPresetOptions(presetOptionList);
+  }, [defaultPresets, presetList.isSuccess]);
 
   // Debounced refetch when endpoint, put in in a useEffect dependand on endpoint
   const debouncedRefetch = useCallback(
@@ -79,16 +140,20 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
   // Save preset function
   const handleSavePreset = () => {
     const currentTemplate = formControl.getValues();
-
+    if (!presetOwner && currentTemplate?.id) {
+      delete currentTemplate.id;
+    }
     savePresetApi.mutate({
       url: "/api/ExecGraphExplorerPreset",
-      data: { action: "copy", preset: currentTemplate },
+      data: { action: presetOwner ? "Save" : "Copy", preset: currentTemplate },
     });
   };
 
   const selectedPresets = useWatch({ control, name: "reportTemplate" });
   useEffect(() => {
     if (selectedPresets?.addedFields?.params) {
+      console.log(selectedPresets.addedFields);
+      setPresetOwner(selectedPresets?.addedFields?.IsMyPreset ?? false);
       Object.keys(selectedPresets.addedFields.params).forEach(
         (key) =>
           selectedPresets.addedFields.params[key] == null &&
@@ -101,7 +166,17 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
       ) {
         selectedPresets.addedFields.params.$select = "";
       }
-      selectedPresets.addedFields.params.$select
+
+      // if $select is an array, extract the values and comma separate
+      if (
+        Array.isArray(selectedPresets.addedFields.params.$select) &&
+        selectedPresets.addedFields.params.$select.length > 0
+      ) {
+        selectedPresets.addedFields.params.$select = selectedPresets.addedFields.params.$select
+          .map((item) => item.value)
+          .join(",");
+      }
+      selectedPresets.addedFields.params.$select !== ""
         ? (selectedPresets.addedFields.params.$select = selectedPresets.addedFields.params?.$select
             ?.split(",")
             .map((item) => ({ label: item, value: item })))
@@ -109,6 +184,7 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
       selectedPresets.addedFields.params.id = selectedPresets.value;
       setSelectedPreset(selectedPresets.value);
       selectedPresets.addedFields.params.name = selectedPresets.label;
+
       formControl.reset(selectedPresets?.addedFields?.params, { keepDefaultValues: true });
     }
   }, [selectedPresets]);
@@ -208,7 +284,10 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
       }
     });
     const resetParams = {
-      Name: "Graph Explorer Report",
+      tenantFilter: tenant,
+      Name: formParameters.name
+        ? `Graph Explorer - ${formParameters.name}`
+        : "Graph Explorer Report",
       command: {
         label: schedulerCommand.Function,
         value: schedulerCommand.Function,
@@ -241,10 +320,38 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
   const [editorValues, setEditorValues] = useState({});
   //keep the editor in sync with the form
 
+  function getPresetProps(values) {
+    var newvals = Object.assign({}, values);
+    if (newvals?.$select !== undefined && Array.isArray(newvals?.$select)) {
+      newvals.$select = newvals?.$select.map((p) => p.value).join(",");
+    }
+    delete newvals["reportTemplate"];
+    delete newvals["tenantFilter"];
+    delete newvals["IsShared"];
+    if (newvals.ReverseTenantLookup === false) {
+      delete newvals.ReverseTenantLookup;
+    }
+    if (newvals.NoPagination === false) {
+      delete newvals.NoPagination;
+    }
+    if (newvals.$count === false) {
+      delete newvals.$count;
+    }
+    Object.keys(newvals).forEach((key) => {
+      if (values[key] === "" || values[key] === null) {
+        delete newvals[key];
+      }
+    });
+    return newvals;
+  }
+
   useEffect(() => {
-    const values = formControl.getValues();
+    var values = getPresetProps(formControl.getValues());
     setOffCanvasContent(() => (
       <>
+        <Typography variant="h5" sx={{ mb: 2 }}>
+          Import / Export Graph Explorer Preset
+        </Typography>
         <CippCodeBlock
           type="editor"
           onChange={(value) => setEditorValues(JSON.parse(value))}
@@ -254,7 +361,7 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
           onClick={() => {
             savePresetApi.mutate({
               url: "/api/ExecGraphExplorerPreset",
-              data: { action: "copy", preset: editorValues },
+              data: { action: "Copy", preset: editorValues },
             });
           }}
           variant="contained"
@@ -272,7 +379,18 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
   };
   // Handle filter form submission
   const onSubmit = (values) => {
-    values.$select = values?.$select?.map((item) => item.value)?.join(",");
+    if (values.$select && Array.isArray(values.$select) && values.$select.length > 0) {
+      values.$select = values?.$select?.map((item) => item.value)?.join(",");
+    }
+    if (values.ReverseTenantLookup === false) {
+      delete values.ReverseTenantLookup;
+    }
+    if (values.NoPagination === false) {
+      delete values.NoPagination;
+    }
+    if (values.$count === false) {
+      delete values.$count;
+    }
     onSubmitFilter(values);
     setCardExpanded(false);
   };
@@ -280,7 +398,7 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
   const deletePreset = (id) => {
     savePresetApi.mutate({
       url: "/api/ExecGraphExplorerPreset",
-      data: { action: "delete", preset: { id: selectedPresetState } },
+      data: { action: "Delete", preset: { id: selectedPresetState } },
     });
   };
 
@@ -307,14 +425,14 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
                   label="Select a Report Preset"
                   multiple={false}
                   formControl={formControl}
-                  api={{
-                    url: "/api/ListGraphExplorerPresets",
-                    dataKey: "Results",
-                    labelField: (option) => option.name,
-                    valueField: (option) => option.id,
-                    queryKey: "ListGraphExplorerPresets",
-                    addedField: { params: "params" },
-                  }}
+                  options={presetOptions}
+                  groupBy={(option) => option.type}
+                  renderGroup={(params) => (
+                    <li key={params.key}>
+                      <GroupHeader>{params.group}</GroupHeader>
+                      <GroupItems>{params.children}</GroupItems>
+                    </li>
+                  )}
                   placeholder="Select a preset"
                 />
               </Grid>
@@ -406,7 +524,7 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
             </Grid>
 
             {/* Reverse Tenant Lookup Switch */}
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={3}>
               <CippFormComponent
                 type="switch"
                 name="ReverseTenantLookup"
@@ -432,7 +550,7 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
             </CippFormCondition>
 
             {/* No Pagination Switch */}
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={3}>
               <CippFormComponent
                 type="switch"
                 name="NoPagination"
@@ -442,12 +560,20 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
             </Grid>
 
             {/* $count Switch */}
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={3}>
               <CippFormComponent
                 type="switch"
                 name="$count"
                 label="Use $count"
                 formControl={formControl}
+              />
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <CippFormComponent
+                name="IsShared"
+                type="switch"
+                formControl={formControl}
+                label="Share Preset"
               />
             </Grid>
 
@@ -460,15 +586,16 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
                   </Button>
                 </Grid>
               </div>
+
               <div>
                 {/* Save Preset Button */}
                 <Button
                   variant="contained"
                   onClick={handleSavePreset}
-                  startIcon={<SaveIcon />}
+                  startIcon={<>{presetOwner ? <SaveIcon /> : <CopyAll />}</>}
                   style={{ marginRight: "8px" }}
                 >
-                  Save Preset
+                  {presetOwner ? "Save" : "Copy"} Preset
                 </Button>
                 {/* Delete Preset Button */}
                 {selectedPresetState && (
@@ -477,6 +604,7 @@ const CippGraphExplorerFilter = ({ onSubmitFilter }) => {
                     variant="contained"
                     onClick={() => deletePreset(selectedPresetState)}
                     style={{ marginRight: "8px" }}
+                    disabled={!presetOwner}
                   >
                     Delete Preset
                   </Button>
