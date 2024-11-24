@@ -1,45 +1,46 @@
+import { TabbedLayout } from "/src/layouts/TabbedLayout";
 import { Layout as DashboardLayout } from "/src/layouts/index.js";
-import { CippTablePage } from "/src/components/CippComponents/CippTablePage.jsx";
+import tabOptions from "./tabOptions";
+import CippTablePage from "/src/components/CippComponents/CippTablePage";
 
-const pageTitle = "GDAP Relationship List";
+const pageTitle = "GDAP Relationships";
 
 const actions = [
   {
     label: "Start Onboarding",
+    link: "/tenant/gdap-management/onboarding/wizard?id=[id]",
     color: "primary",
-    link: "/tenant/administration/tenant-onboarding-wizard?tableFilter=Complex: id eq [id]",
   },
   {
     label: "Open Relationship in Partner Center",
-    color: "info",
     link: "https://partner.microsoft.com/en-us/dashboard/commerce2/customers/[customer.tenantId]/adminrelationships/[id]",
+    color: "info",
     external: true,
   },
   {
     label: "Enable automatic extension",
+    type: "POST",
+    url: "/api/ExecAutoExtendGDAP?ID=[id]",
+    confirmText: "Are you sure you want to enable auto-extend for this relationship?",
     color: "info",
-    modal: true,
-    modalUrl: "/api/ExecAutoExtendGDAP?ID=[id]",
-    modalMessage: "Are you sure you want to enable auto-extend for this relationship?",
   },
   {
     label: "Remove Global Administrator from Relationship",
+    type: "POST",
+    url: "/api/ExecGDAPRemoveGArole?&GDAPID=[id]",
+    confirmText: "Are you sure you want to remove Global Administrator from this relationship?",
     color: "danger",
-    modal: true,
-    modalUrl: "/api/ExecGDAPRemoveGArole?&GDAPID=[id]",
-    modalMessage: "Are you sure you want to remove Global Administrator from this relationship?",
   },
   {
     label: "Terminate Relationship",
+    type: "POST",
+    url: "/api/ExecDeleteGDAPRelationship?GDAPID=[id]",
+    confirmText: "Are you sure you want to terminate this relationship?",
     color: "error",
-    modal: true,
-    modalUrl: "/api/ExecDeleteGDAPRelationship?GDAPID=[id]",
-    modalMessage: "Are you sure you want to delete this relationship?",
   },
 ];
 
 const offCanvas = {
-  extendedInfoFields: ["InviteUrl", "accessDetails.unifiedRoles.roleDefinitionId"],
   actions: actions,
 };
 
@@ -76,6 +77,10 @@ const Page = () => {
   );
 };
 
-Page.getLayout = (page) => <DashboardLayout>{page}</DashboardLayout>;
+Page.getLayout = (page) => (
+  <DashboardLayout>
+    <TabbedLayout tabOptions={tabOptions}>{page}</TabbedLayout>
+  </DashboardLayout>
+);
 
 export default Page;
