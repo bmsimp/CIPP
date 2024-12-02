@@ -65,6 +65,7 @@ export const getCippFormatting = (data, cellName, type) => {
     "LastRefresh",
     "createdDateTime",
     "activatedDateTime",
+    "lastModifiedDateTime",
     "endDateTime",
   ];
   if (timeAgoArray.includes(cellName)) {
@@ -165,13 +166,17 @@ export const getCippFormatting = (data, cellName, type) => {
       return isText
         ? data.join(", ")
         : data.map((item) => (
-            <CippCopyToClipBoard key={item.value} text={item.label} type="chip" />
+            <CippCopyToClipBoard
+              key={`${item.label}`}
+              text={item.label ? item.label : item}
+              type="chip"
+            />
           ));
     } else {
       return isText ? (
         data
       ) : (
-        <Chip variant="outlined" label={data.label} size="small" color="info" />
+        <CippCopyToClipBoard text={data.label ? data.label : data} type="chip" />
       );
     }
   }
