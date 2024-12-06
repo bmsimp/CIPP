@@ -2,7 +2,6 @@ import { Layout as DashboardLayout } from "/src/layouts/index.js";
 import { CippWizardConfirmation } from "/src/components/CippWizard/CippWizardConfirmation";
 import CippWizardPage from "/src/components/CippWizard/CippWizardPage.jsx";
 import { CippTenantStep } from "../../../../components/CippWizard/CippTenantStep";
-import { CippCAForm } from "../../../../components/CippWizard/CippCAForm";
 import { CippIntunePolicy } from "../../../../components/CippWizard/CippIntunePolicy";
 
 const Page = () => {
@@ -28,9 +27,10 @@ const Page = () => {
   return (
     <>
       <CippWizardPage
+        queryKeys={[["Configuration Policies"]]}
         steps={steps}
         wizardTitle="Apply Policy Wizard"
-        postUrl={"/api/ExecSAMSetup"}
+        postUrl={"/api/AddPolicy"}
       />
     </>
   );
