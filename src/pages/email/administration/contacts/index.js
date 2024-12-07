@@ -1,6 +1,8 @@
 import { Layout as DashboardLayout } from "/src/layouts/index.js";
 import { CippTablePage } from "/src/components/CippComponents/CippTablePage.jsx";
 import { Edit } from "@mui/icons-material";
+import { Button } from "@mui/material";
+import Link from "next/link";
 
 const Page = () => {
   const pageTitle = "Contacts";
@@ -26,7 +28,6 @@ const Page = () => {
     },
   ];
 
-
   const simpleColumns = ["displayName", "mail", "companyName", "onPremisesSyncEnabled"];
 
   return (
@@ -35,13 +36,13 @@ const Page = () => {
       apiUrl="/api/ListContacts"
       actions={actions}
       simpleColumns={simpleColumns}
-      titleButton={{
-        label: "Add Contact",
-        href: "/email/administration/add-contact",
-      }}
-      /* Developer Note:
-      Bulk removal is available in actionsList with "Remove selected Contacts."
-      Uncomment if needed when `CippTablePage` bulk actions support is confirmed. */
+      cardButton={
+        <>
+          <Button component={Link} href="/email/administration/contacts/add">
+            Add contact
+          </Button>
+        </>
+      }
     />
   );
 };
