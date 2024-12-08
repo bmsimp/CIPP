@@ -1,4 +1,4 @@
-import { DeveloperMode, Sync, ViewColumn } from "@mui/icons-material";
+import { DeveloperMode, FilterTiltShift, Sync, ViewColumn } from "@mui/icons-material";
 import {
   Button,
   Checkbox,
@@ -13,7 +13,12 @@ import {
 import { Box, Stack } from "@mui/system";
 import { MRT_GlobalFilterTextField, MRT_ToggleFiltersButton } from "material-react-table";
 import { PDFExportButton } from "../pdfExportButton";
-import { ChevronDownIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
+import {
+  ChevronDownIcon,
+  ExclamationCircleIcon,
+  MagnifyingGlassCircleIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/24/outline";
 import { usePopover } from "../../hooks/use-popover";
 import { CSVExportButton } from "../csvExportButton";
 import { useDialog } from "../../hooks/use-dialog";
@@ -34,11 +39,14 @@ export const CIPPTableToptoolbar = ({
   setColumnVisibility,
   title,
   actions,
+  filters,
   exportEnabled,
   refreshFunction,
 }) => {
   const popover = usePopover();
   const columnPopover = usePopover();
+  const filterPopover = usePopover();
+
   const settings = useSettings();
   const router = useRouter();
   const createDialog = useDialog();
@@ -80,6 +88,20 @@ export const CIPPTableToptoolbar = ({
     });
   };
 
+  const setTableFilter = (filter, filterType) => {
+    if (filterType === "global" || filterType === undefined) {
+      table.setGlobalFilter(filter);
+    }
+    if (filterType === "column") {
+      table.setShowColumnFilters(true);
+      table.setColumnFilters(filter);
+    }
+    if (filterType === "reset") {
+      table.resetGlobalFilter();
+      table.resetColumnFilters();
+      console.log(table);
+    }
+  };
   return (
     <>
       <Box
@@ -142,6 +164,28 @@ export const CIPPTableToptoolbar = ({
             </Tooltip>
 
             <MRT_GlobalFilterTextField table={table} />
+            <Tooltip title="Preset Filters">
+              <IconButton onClick={filterPopover.handleOpen} ref={filterPopover.anchorRef}>
+                <SvgIcon>
+                  <MagnifyingGlassIcon />
+                </SvgIcon>
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={filterPopover.anchorRef.current}
+              open={filterPopover.open}
+              onClose={filterPopover.handleClose}
+              MenuListProps={{ dense: true }}
+            >
+              <MenuItem onClick={() => setTableFilter("", "reset")}>
+                <ListItemText primary="Reset all filters" />
+              </MenuItem>
+              {filters?.map((filter) => (
+                <MenuItem key={filter.id} onClick={() => setTableFilter(filter.value, filter.type)}>
+                  <ListItemText primary={filter.filterName} />
+                </MenuItem>
+              ))}
+            </Menu>
             <MRT_ToggleFiltersButton table={table} />
             <Tooltip title="Toggle Column Visibility">
               <IconButton onClick={columnPopover.handleOpen} ref={columnPopover.anchorRef}>
