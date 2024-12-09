@@ -73,20 +73,6 @@ export const getCippFormatting = (data, cellName, type) => {
     return <CippTimeAgo data={data} type={type} />;
   }
 
-  const durationArray = ["autoExtendDuration"];
-  if (durationArray.includes(cellName)) {
-    isoDuration.setLocales(
-      {
-        en,
-      },
-      {
-        fallbackLocale: "en",
-      }
-    );
-    const duration = isoDuration(data);
-    return duration.humanize("en");
-  }
-
   const passwordItems = ["password", "applicationsecret", "refreshtoken"];
 
   if (passwordItems.includes(cellNameLower)) {
@@ -285,6 +271,20 @@ export const getCippFormatting = (data, cellName, type) => {
     );
   }
 
+  const durationArray = ["autoExtendDuration"];
+  if (durationArray.includes(cellName)) {
+    isoDuration.setLocales(
+      {
+        en,
+      },
+      {
+        fallbackLocale: "en",
+      }
+    );
+    const duration = isoDuration(data);
+    return duration.humanize("en");
+  }
+
   //if string starts with http, return a link
   if (typeof data === "string" && data.toLowerCase().startsWith("http")) {
     return isText ? (
@@ -306,7 +306,11 @@ export const getCippFormatting = (data, cellName, type) => {
 
   // Handle objects
   if (typeof data === "object" && data !== null) {
-    return isText ? JSON.stringify(data) : <CippDataTableButton data={data} />;
+    return isText ? (
+      JSON.stringify(data)
+    ) : (
+      <CippDataTableButton data={data} tableTitle={getCippTranslation(cellName)} />
+    );
   }
 
   // Default case: return data as-is
