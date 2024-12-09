@@ -159,7 +159,6 @@ const Page = () => {
 
   useEffect(() => {
     if (currentRelationship?.value) {
-      console.log("useEffect");
       var currentRoles = [];
       if (currentInvite?.RoleMappings) {
         currentRoles = currentInvite?.RoleMappings;
@@ -212,7 +211,6 @@ const Page = () => {
       startOnboarding?.data?.data?.Status !== "succeeded" &&
       startOnboarding?.data?.data?.Status !== "failed"
     ) {
-      console.log(startOnboarding?.data?.data?.Status);
       const interval = setInterval(() => {
         startOnboarding.mutate({
           url: "/api/ExecOnboardTenant",
