@@ -72,13 +72,10 @@ const Page = () => {
 
   useEffect(() => {
     if (mappedRoles.isSuccess && roleTemplates.isSuccess && pendingInvites.isSuccess) {
-      // if mapped roles exist, move to next step
       if (mappedRoles?.data?.pages?.[0]?.length > 0) {
         setActiveStep(1);
-        // if role templates exist, move to next step
         if (roleTemplates?.data?.pages?.[0]?.Results?.length > 0) {
           setActiveStep(2);
-          // if pending invites exist, move to next step
           if (pendingInvites?.data?.pages?.[0]?.length > 0) {
             setActiveStep(4);
           }
