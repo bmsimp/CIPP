@@ -77,7 +77,7 @@ const Page = () => {
       setActiveStep(stepCount);
 
       if (data?.Status === "succeeded" || data?.Status === "failed") {
-        var runningSteps = data.OnboardingSteps.find((step) => step.Status === "running");
+        var runningSteps = data.OnboardingSteps?.find((step) => step.Status === "running");
         if (!runningSteps) {
           setPollOnboarding(false);
         }
@@ -104,8 +104,8 @@ const Page = () => {
     ) {
       var formValue = selectedRelationship;
       if (!selectedRelationship?.value && queryId) {
-        var relationship = relationshipList.data?.Results?.find(
-          (relationship) => relationship.id === queryId
+        var relationship = relationshipList?.data?.Results?.find(
+          (relationship) => relationship?.id === queryId
         );
 
         if (relationship) {
@@ -133,17 +133,21 @@ const Page = () => {
         }
       }
       const invite = currentInvites?.data?.pages?.[0]?.find(
-        (invite) => invite.RowKey === formValue?.value
+        (invite) => invite?.RowKey === formValue?.value
       );
 
       const onboarding = onboardingList.data?.pages?.[0]?.find(
-        (onboarding) => onboarding.RowKey === formValue?.value
+        (onboarding) => onboarding?.RowKey === formValue?.value
       );
       if (onboarding) {
         setCurrentOnboarding(onboarding);
         var stepCount = 0;
-        onboarding.OnboardingSteps.map((step) => {
-          if (step.Status !== "pending" && step.Status !== "running" && step.Status !== "failed") {
+        onboarding?.OnboardingSteps?.map((step) => {
+          if (
+            step?.Status !== "pending" &&
+            step?.Status !== "running" &&
+            step?.Status !== "failed"
+          ) {
             stepCount++;
           }
         });
@@ -179,7 +183,7 @@ const Page = () => {
 
       currentRoles?.forEach((role) => {
         if (
-          !relationshipRoles.find(
+          !relationshipRoles?.find(
             (relationshipRole) => relationshipRole.roleDefinitionId === role.roleDefinitionId
           )
         ) {
@@ -194,14 +198,14 @@ const Page = () => {
           )
         ) {
           // lookup role from GDAPRoles
-          var role = GDAPRoles.find((gdapRole) => gdapRole.ObjectId === role.roleDefinitionId);
+          var role = GDAPRoles?.find((gdapRole) => gdapRole.ObjectId === role.roleDefinitionId);
           missingRolesRelationship.push(role);
         }
       });
 
       var missingDefaults = [];
       relationshipRoles.forEach((role) => {
-        if (!cippDefaults.find((defaultRole) => defaultRole.value === role.roleDefinitionId)) {
+        if (!cippDefaults?.find((defaultRole) => defaultRole.value === role.roleDefinitionId)) {
           missingDefaults.push(role);
         }
       });
@@ -352,7 +356,7 @@ const Page = () => {
                         url: "/api/ExecGDAPRoleTemplate",
                         queryKey: "GDAPTemplates",
                         dataKey: "Results",
-                        labelField: (option) => option.TemplateId,
+                        labelField: (option) => option?.TemplateId,
                         valueField: "RoleMappings",
                       }}
                       required={true}
