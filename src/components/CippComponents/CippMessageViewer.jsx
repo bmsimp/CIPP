@@ -1,22 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-//import PropTypes from "prop-types";
-//import { CippPage, CippMasonry, CippMasonryItem, CippContentCard } from "src/components/layout";
-import { parseEml, readEml, GBKUTF8, decode } from "eml-parse-js";
-import { useMediaPredicate } from "react-media-hook";
-//import { useSelector } from "react-redux";
-//import { CellDate } from "src/components/tables";
-//import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-/*import {
-  CButton,
-  CCard,
-  CCardBody,
-  CCol,
-  CDropdown,
-  CDropdownMenu,
-  CDropdownToggle,
-  CLink,
-  CRow,
-} from "@coreui/react";*/
+import { readEml } from "eml-parse-js";
 
 import {
   Button,
@@ -24,13 +7,17 @@ import {
   CardContent,
   Menu,
   MenuItem,
-  Link,
   Typography,
   SvgIcon,
   CardHeader,
-  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
-import { Box, Grid, Stack } from "@mui/system";
+import { Box, Grid, Stack, ThemeProvider } from "@mui/system";
+import { createTheme } from "@mui/material/styles";
 
 import {
   Image,
@@ -47,22 +34,55 @@ import {
   Download,
   Visibility,
   AccountCircle,
+  Close,
 } from "@mui/icons-material";
 
-//import ReactTimeAgo from "react-time-ago";
 import { CippTimeAgo } from "./CippTimeAgo";
 import { CippCodeBlock } from "./CippCodeBlock";
 import DOMPurify from "dompurify";
 import ReactHtmlParser from "react-html-parser";
 import { FileDropzone } from "/src/components/file-dropzone.js";
 import CippPageCard from "../CippCards/CippPageCard";
+import {
+  MoonIcon,
+  ShieldCheckIcon,
+  ShieldExclamationIcon,
+  SunIcon,
+} from "@heroicons/react/24/outline";
+import { useSettings } from "/src/hooks/use-settings";
 
 export const CippMessageViewer = ({ emailSource }) => {
   const [emlContent, setEmlContent] = useState(null);
   const [emlError, setEmlError] = useState(false);
   const [messageHtml, setMessageHtml] = useState("");
   const [emlHeaders, setEmlHeaders] = useState(null);
-  const [anchorEl, setAnchorEl] = useState(null);
+  const [anchorEl, setAnchorEl] = useState({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogContent, setDialogContent] = useState(null);
+  const [dialogTitle, setDialogTitle] = useState("");
+
+  const currentTheme = useSettings()?.currentTheme?.value;
+  const [darkMode, setDarkMode] = useState(currentTheme === "dark");
+
+  const theme = createTheme({
+    palette: {
+      background: {
+        default: darkMode ? "#121212" : "#ffffff",
+        paper: darkMode ? "#1d1d1d" : "#f5f5f5",
+      },
+      text: {
+        primary: darkMode ? "#ffffff" : "#000000",
+        secondary: darkMode ? "#b0bec5" : "#757575",
+      },
+      action: {
+        active: darkMode ? "#ffffff" : "#000000",
+      },
+    },
+  });
+
+  const toggleDarkMode = () => {
+    setDarkMode((prevMode) => !prevMode);
+  };
 
   const getAttachmentIcon = (contentType) => {
     if (contentType.includes("image")) {
@@ -107,43 +127,37 @@ export const CippMessageViewer = ({ emailSource }) => {
           .map((c) => c.charCodeAt(0))
       );
     }
-    var fileName = attachment.name;
+
+    var fileName = attachment?.name ?? "attachment";
     const blob = new Blob([fileBytes], { type: contentType ?? "application/octet-stream" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     if (newTab) {
       if (contentType.includes("rfc822")) {
         var content = fileBytes;
-        const nestedMessage = <MessageViewer emailSource={content} />;
-        ModalService.open({
-          body: nestedMessage,
-          title: fileName,
-          size: "lg",
-        });
+        const nestedMessage = <CippMessageViewer emailSource={content} />;
+        setDialogContent(nestedMessage);
+        setDialogTitle(fileName);
+        setDialogOpen(true);
       } else if (contentType.includes("pdf")) {
         const embeddedPdf = (
           <object data={url} type="application/pdf" width="100%" height="600px" />
         );
-        ModalService.open({
-          body: embeddedPdf,
-          title: fileName,
-          size: "lg",
-        });
+        setDialogContent(embeddedPdf);
+        setDialogTitle(fileName);
+        setDialogOpen(true);
       } else if (contentType.includes("image")) {
         const embeddedImage = <img src={url} alt={fileName} style={{ maxWidth: "100%" }} />;
-        ModalService.open({
-          body: embeddedImage,
-          title: fileName,
-          size: "lg",
-        });
+        setDialogContent(embeddedImage);
+        setDialogTitle(fileName);
+        setDialogOpen(true);
       } else if (contentType.includes("text")) {
         const textContent = fileBytes;
-        ModalService.open({
-          data: textContent,
-          componentType: "codeblock",
-          title: fileName,
-          size: "lg",
-        });
+        setDialogContent(
+          <CippCodeBlock code={textContent} language="plain" showLineNumbers={false} />
+        );
+        setDialogTitle(fileName);
+        setDialogOpen(true);
         setTimeout(() => {
           URL.revokeObjectURL(url);
         }, 1000);
@@ -165,12 +179,9 @@ export const CippMessageViewer = ({ emailSource }) => {
   }
 
   const showEmailModal = (emailSource, title = "Email Source") => {
-    ModalService.open({
-      data: emailSource,
-      componentType: "codeblock",
-      title: title,
-      size: "lg",
-    });
+    setDialogContent(<CippCodeBlock code={emailSource} language="plain" showLineNumbers={false} />);
+    setDialogTitle(title);
+    setDialogOpen(true);
   };
 
   const EmailButtons = (emailHeaders, emailSource) => {
@@ -222,6 +233,32 @@ export const CippMessageViewer = ({ emailSource }) => {
         if (ReadEmlJson.html) {
           var sanitizedHtml = DOMPurify.sanitize(ReadEmlJson.html);
           var parsedHtml = ReactHtmlParser(sanitizedHtml);
+          if (ReadEmlJson.attachments) {
+            ReadEmlJson.attachments.forEach((attachment) => {
+              if (attachment.id) {
+                var cid = attachment.id.match(/<(.*)>/)[1];
+                var base64 = attachment.data64;
+                if (base64) {
+                  const replaceCidWithBase64 = (element) => {
+                    if (typeof element === "object" && element !== null) {
+                      if (element.props.src === "cid:" + cid) {
+                        return <img src={"data:image/png;base64," + base64} alt={cid} />;
+                      } else if (element.props.children) {
+                        return React.cloneElement(element, {
+                          children: React.Children.map(
+                            element.props.children,
+                            replaceCidWithBase64
+                          ),
+                        });
+                      }
+                    }
+                    return element;
+                  };
+                  parsedHtml = parsedHtml.map(replaceCidWithBase64);
+                }
+              }
+            });
+          }
           setMessageHtml(parsedHtml);
         } else {
           setMessageHtml(null);
@@ -275,21 +312,73 @@ export const CippMessageViewer = ({ emailSource }) => {
                       <Typography variant="subtitle2" color="textSecondary">
                         &lt;{emlContent?.from?.email}&gt;
                       </Typography>
+
+                      {(() => {
+                        const authResults = emlContent?.headers?.["Authentication-Results"] || "";
+                        const dmarcPass = authResults ? authResults.includes("dmarc=pass") : false;
+                        const dkimPass = authResults ? authResults.includes("dkim=pass") : false;
+                        const spfPass = authResults ? authResults.includes("spf=pass") : false;
+                        const arcPass = authResults ? authResults.includes("arc=pass") : false;
+                        const daraPass = authResults ? authResults.includes("dara=pass") : false;
+                        const allPass = dmarcPass && dkimPass && spfPass && arcPass && daraPass;
+                        const somePass = dmarcPass || dkimPass || spfPass || arcPass || daraPass;
+                        const noResults = authResults === "";
+                        const color = noResults
+                          ? ""
+                          : allPass
+                          ? "green"
+                          : somePass
+                          ? "orange"
+                          : "red";
+                        const icon = noResults ? (
+                          <ShieldExclamationIcon />
+                        ) : allPass ? (
+                          <ShieldCheckIcon />
+                        ) : somePass ? (
+                          <ShieldExclamationIcon />
+                        ) : (
+                          <ShieldExclamationIcon />
+                        );
+
+                        return (
+                          <Tooltip
+                            title={
+                              noResults
+                                ? "No authentication results available"
+                                : `DMARC: ${dmarcPass ? "pass" : "fail"}, DKIM: ${
+                                    dkimPass ? "pass" : "fail"
+                                  }, SPF: ${spfPass ? "pass" : "fail"}, ARC: ${
+                                    arcPass ? "pass" : "fail"
+                                  }, DARA: ${daraPass ? "pass" : "fail"}`
+                            }
+                            placement="top"
+                          >
+                            <SvgIcon fontSize="small" sx={{ color }} style={{ cursor: "pointer" }}>
+                              {icon}
+                            </SvgIcon>
+                          </Tooltip>
+                        );
+                      })()}
                     </Stack>
                   </Box>
-                  {emlContent?.to?.length > 0 && (
+
+                  {emlContent?.to && (
                     <Box>
                       <Typography variant="subtitle2">
                         <b>To:</b>{" "}
-                        {emlContent?.to?.map((to) => to.name + " <" + to.email + ">").join(", ")}
+                        {Array.isArray(emlContent.to)
+                          ? emlContent.to.map((to) => to.name + " <" + to.email + ">").join(", ")
+                          : emlContent.to.name + " <" + emlContent.to.email + ">"}
                       </Typography>
                     </Box>
                   )}
-                  {emlContent?.cc?.length > 0 && (
+                  {emlContent?.cc && (
                     <div>
                       <small>
                         <b>CC:</b>{" "}
-                        {emlContent?.cc?.map((cc) => cc.name + " <" + cc.email + ">").join(", ")}
+                        {Array.isArray(emlContent.cc)
+                          ? emlContent.cc.map((cc) => cc.name + " <" + cc.email + ">").join(", ")
+                          : emlContent.cc.name + " <" + emlContent.cc.email + ">"}
                       </small>
                     </div>
                   )}
@@ -316,12 +405,13 @@ export const CippMessageViewer = ({ emailSource }) => {
                   <Grid item size={12}>
                     <Stack spacing={1} direction="row">
                       {emlContent?.attachments?.map((attachment, index) => (
-                        <>
+                        <React.Fragment key={index}>
                           <Button
-                            key={index}
                             variant="contained"
                             size="small"
-                            onClick={(event) => setAnchorEl(event.currentTarget)}
+                            onClick={(event) =>
+                              setAnchorEl({ ...anchorEl, [index]: event.currentTarget })
+                            }
                             startIcon={
                               <SvgIcon fontSize="small">
                                 {getAttachmentIcon(attachment?.contentType ?? "text/plain")}
@@ -332,12 +422,12 @@ export const CippMessageViewer = ({ emailSource }) => {
                           </Button>
 
                           <Menu
-                            anchorEl={anchorEl}
-                            open={Boolean(anchorEl)}
-                            onClose={() => setAnchorEl(null)}
+                            anchorEl={anchorEl[index]}
+                            open={Boolean(anchorEl[index])}
+                            onClose={() => setAnchorEl({ ...anchorEl, [index]: null })}
                           >
                             <MenuItem onClick={() => downloadAttachment(attachment)}>
-                              <Download />
+                              <Download sx={{ mr: 1 }} />
                               Download
                             </MenuItem>
                             {(attachment?.contentType === undefined ||
@@ -346,12 +436,12 @@ export const CippMessageViewer = ({ emailSource }) => {
                               attachment?.contentType?.includes("image") ||
                               attachment?.contentType?.includes("rfc822")) && (
                               <MenuItem onClick={() => downloadAttachment(attachment, true)}>
-                                <Visibility className="me-2" />
+                                <Visibility sx={{ mr: 1 }} />
                                 View
                               </MenuItem>
                             )}
                           </Menu>
-                        </>
+                        </React.Fragment>
                       ))}
                     </Stack>
                   </Grid>
@@ -361,14 +451,22 @@ export const CippMessageViewer = ({ emailSource }) => {
               {(emlContent?.text || emlContent?.html) && (
                 <Grid container spacing={2}>
                   <Grid item size={12}>
-                    <Divider />
-                  </Grid>
-                  <Grid item size={12}>
                     {messageHtml ? (
-                      <div className="mt-4">{messageHtml}</div>
+                      <ThemeProvider theme={theme}>
+                        <Card variant="outlined">
+                          <CardContent>
+                            <Box display="flex" justifyContent="flex-end" mb={1}>
+                              <IconButton variant="text" onClick={toggleDarkMode}>
+                                <SvgIcon>{darkMode ? <SunIcon /> : <MoonIcon />}</SvgIcon>
+                              </IconButton>
+                            </Box>
+                            {messageHtml}
+                          </CardContent>
+                        </Card>
+                      </ThemeProvider>
                     ) : (
                       <div className="mt-4">
-                        <CippCodeBlock
+                        <CodeBlock
                           code={emlContent?.text ?? "No text"}
                           language="plain"
                           showLineNumbers={false}
@@ -382,6 +480,24 @@ export const CippMessageViewer = ({ emailSource }) => {
           </Card>
         </>
       )}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ py: 2 }}>
+          {dialogTitle}
+          <IconButton
+            aria-label="close"
+            onClick={() => setDialogOpen(false)}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>{dialogContent}</DialogContent>
+      </Dialog>
     </>
   );
 };
@@ -403,10 +519,9 @@ const CippMessageViewerPage = () => {
   return (
     <CippPageCard title="Message Viewer" hideBackButton={true}>
       <FileDropzone
-        title="Load Message"
         onDrop={onDrop}
         accept={{ "message/rfc822": [".eml"] }}
-        dropMessage="Drag an EML file or click to add"
+        caption="Drag an EML file or click to add"
         maxFiles={1}
       />
       {emlFile && <CippMessageViewer emailSource={emlFile} />}
