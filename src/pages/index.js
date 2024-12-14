@@ -12,6 +12,7 @@ import { BulkActionsMenu } from "../components/bulk-actions-menu.js";
 import { CippUniversalSearch } from "../components/CippCards/CippUniversalSearch.jsx";
 import { ApiGetCall } from "../api/ApiCall.jsx";
 import { CippCopyToClipBoard } from "../components/CippComponents/CippCopyToClipboard.jsx";
+
 const Page = () => {
   const { currentTenant } = useSettings();
   const [domainVisible, setDomainVisible] = useState(false);
@@ -24,6 +25,7 @@ const Page = () => {
 
   const dashboard = ApiGetCall({
     url: "/api/ListuserCounts",
+    data: { tenantFilter: currentTenant },
     queryKey: `${currentTenant}-ListuserCounts`,
   });
 
@@ -44,9 +46,8 @@ const Page = () => {
   });
 
   const standards = ApiGetCall({
-    url: "/api/ListStandards",
-    queryKey: `${currentTenant}-ListStandards`,
-    data: { ShowConsolidated: true, TenantFilter: currentTenant },
+    url: "/api/ListStandardTemplates",
+    queryKey: `${currentTenant}-ListStandardTemplates`,
   });
 
   const partners = ApiGetCall({
@@ -71,8 +72,7 @@ const Page = () => {
       name: "Tenant ID",
       data: (
         <>
-          {organization.data?.id}
-          <CippCopyToClipBoard text={organization.data?.id} />
+          <CippCopyToClipBoard text={organization.data?.id} type="chip" />
         </>
       ),
     },
@@ -80,8 +80,7 @@ const Page = () => {
       name: "Default Domain",
       data: (
         <>
-          {organization.data?.verifiedDomains?.[0]?.name}
-          <CippCopyToClipBoard text={organization.data?.verifiedDomains?.[0]?.name} />
+          <CippCopyToClipBoard text={organization.data?.verifiedDomains?.[0]?.name} type="chip" />
         </>
       ),
     },
@@ -91,10 +90,54 @@ const Page = () => {
     },
   ];
 
-  const filteredStandardsCount = (type) =>
-    standards.data
-      ? standards.data.filter((standard) => standard.Settings?.[type] === true).length
-      : 0;
+  // Helper to get action counts for the current tenant
+  function getActionCountsForTenant(standardsData, currentTenant) {
+    if (!standardsData) return { remediateCount: 0, alertCount: 0, reportCount: 0, total: 0 };
+
+    // Identify which templates apply:
+    const applicableTemplates = standardsData.filter((template) => {
+      const tenantInFilter = template.tenantFilter.some((tf) => tf.value === currentTenant);
+      const allTenantsTemplate =
+        template.tenantFilter.some((tf) => tf.value === "AllTenants") &&
+        !template.excludedTenants?.some((et) => et.value === currentTenant);
+      return tenantInFilter || allTenantsTemplate;
+    });
+
+    // Combine standards from all applicable templates:
+    let combinedStandards = {};
+    for (const template of applicableTemplates) {
+      for (const [standardKey, standardValue] of Object.entries(template.standards)) {
+        combinedStandards[standardKey] = standardValue;
+      }
+    }
+
+    // Count each action type:
+    let remediateCount = 0;
+    let alertCount = 0;
+    let reportCount = 0;
+
+    for (const [, standard] of Object.entries(combinedStandards)) {
+      const actions = standard.action || [];
+      actions.forEach((actionObj) => {
+        if (actionObj.value === "Remediate") {
+          remediateCount++;
+        } else if (actionObj.value === "Alert") {
+          alertCount++;
+        } else if (actionObj.value === "Report") {
+          reportCount++;
+        }
+      });
+    }
+
+    const total = Object.keys(combinedStandards).length;
+    return { remediateCount, alertCount, reportCount, total };
+  }
+
+  const { remediateCount, alertCount, reportCount, total } = getActionCountsForTenant(
+    standards.data,
+    currentTenant
+  );
+
   const tenantLookup = currentTenantInfo.data?.find(
     (tenant) => tenant.defaultDomainName === currentTenant
   );
@@ -103,6 +146,7 @@ const Page = () => {
     target: "_blank",
     link: portal.url.replace(portal.variable, tenantLookup?.[portal.variable]),
   }));
+
   return (
     <>
       <Head>
@@ -126,12 +170,22 @@ const Page = () => {
                 isFetching={dashboard.isFetching || GlobalAdminList.isFetching}
                 chartType="pie"
                 chartSeries={[
-                  dashboard.data?.Users,
-                  dashboard.data?.LicUsers,
-                  dashboard.data?.Guests,
-                  GlobalAdminList.data?.Results?.length,
+                  Number(dashboard.data?.LicUsers || 0),
+                  dashboard.data?.Users &&
+                  dashboard.data?.LicUsers &&
+                  GlobalAdminList.data?.Results &&
+                  dashboard.data?.Guests
+                    ? Number(
+                        dashboard.data?.Users -
+                          dashboard.data?.LicUsers -
+                          dashboard.data?.Guests -
+                          GlobalAdminList.data?.Results?.length
+                      )
+                    : 0,
+                  Number(dashboard.data?.Guests || 0),
+                  Number(GlobalAdminList.data?.Results?.length || 0),
                 ]}
-                labels={["Total Users", "Licensed Users", "Guests", "Global Admins"]}
+                labels={["Licensed Users", "Unlicensed Users", "Guests", "Global Admins"]}
               />
             </Grid>
 
@@ -139,14 +193,9 @@ const Page = () => {
               <CippChartCard
                 title="Standards Set"
                 isFetching={standards.isFetching}
-                chartType="line"
-                chartSeries={[
-                  standards.data ? filteredStandardsCount("remediate") : 0,
-                  standards.data ? filteredStandardsCount("alert") : 0,
-                  standards.data ? filteredStandardsCount("report") : 0,
-                  standards.data?.length || 0,
-                ]}
-                labels={["Remediation", "Alert", "Report", "Total Available"]}
+                chartType="bar"
+                chartSeries={[remediateCount || 0, alertCount || 0, reportCount || 0]}
+                labels={["Remediation", "Alert", "Report"]}
               />
             </Grid>
 
@@ -156,8 +205,8 @@ const Page = () => {
                 isFetching={sharepoint.isFetching}
                 chartType="donut"
                 chartSeries={[
-                  Number(sharepoint.data?.TenantStorageMB - sharepoint.data?.GeoUsedStorageMB),
-                  Number(sharepoint.data?.GeoUsedStorageMB),
+                  Number(sharepoint.data?.TenantStorageMB - sharepoint.data?.GeoUsedStorageMB) || 0,
+                  Number(sharepoint.data?.GeoUsedStorageMB) || 0,
                 ]}
                 labels={[
                   `Free (${
