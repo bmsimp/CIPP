@@ -1,22 +1,99 @@
-import { Close } from "@mui/icons-material";
+import { Close, ContentCopy } from "@mui/icons-material";
 import { Alert, CircularProgress, Collapse, IconButton, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getCippError } from "../../utils/get-cipp-error";
+import { CippCopyToClipBoard } from "./CippCopyToClipboard";
+import { Grid } from "@mui/system";
+
+const extractAllResults = (data) => {
+  const results = [];
+
+  const processResultItem = (item) => {
+    if (typeof item === "string") {
+      return {
+        text: item,
+        copyField: item,
+        severity: "success",
+      };
+    }
+
+    if (item && typeof item === "object") {
+      const text = item.resultText || "";
+      const copyField = item.copyField || text;
+      const severity = item.state || "success";
+
+      if (text) {
+        return {
+          text,
+          copyField,
+          severity,
+        };
+      }
+    }
+    return null;
+  };
+
+  const extractFrom = (obj) => {
+    if (!obj) return;
+
+    if (Array.isArray(obj)) {
+      obj.forEach((item) => extractFrom(item));
+      return;
+    }
+
+    if (typeof obj === "string") {
+      results.push({ text: obj, copyField: obj, severity: "success" });
+      return;
+    }
+
+    if (typeof obj === "object") {
+      Object.keys(obj).forEach((key) => {
+        const value = obj[key];
+        if (["Results", "Result", "results", "result"].includes(key)) {
+          if (Array.isArray(value)) {
+            value.forEach((valItem) => {
+              const processed = processResultItem(valItem);
+              if (processed) {
+                results.push(processed);
+              } else {
+                extractFrom(valItem);
+              }
+            });
+          } else if (typeof value === "object") {
+            const processed = processResultItem(value);
+            if (processed) {
+              results.push(processed);
+            } else {
+              extractFrom(value);
+            }
+          } else if (typeof value === "string") {
+            results.push({ text: value, copyField: value, severity: "success" });
+          }
+        } else {
+          extractFrom(value);
+        }
+      });
+    }
+  };
+
+  extractFrom(data);
+  return results;
+};
 
 export const CippApiResults = (props) => {
   const { apiObject, errorsOnly = false, alertSx = {} } = props;
 
   const [errorVisible, setErrorVisible] = useState(false);
-  const [successVisible, setSuccessVisible] = useState(false);
   const [fetchingVisible, setFetchingVisible] = useState(false);
-  const [partialResults, setPartialResults] = useState([]);
+  const [finalResults, setFinalResults] = useState([]);
+
+  const allResults = useMemo(() => {
+    const apiResults = extractAllResults(apiObject.data);
+    return apiResults;
+  }, [apiObject]);
 
   useEffect(() => {
-    if (apiObject.isError) {
-      setErrorVisible(true);
-    } else {
-      setErrorVisible(false);
-    }
+    setErrorVisible(!!apiObject.isError);
 
     if (!errorsOnly) {
       if (apiObject.isFetching || (apiObject.isIdle === false && apiObject.isPending === true)) {
@@ -24,30 +101,37 @@ export const CippApiResults = (props) => {
       } else {
         setFetchingVisible(false);
       }
-
-      if (apiObject.isSuccess || partialResults.length > 0) {
-        setSuccessVisible(true);
+      if (allResults.length > 0) {
+        setFinalResults(
+          allResults.map((res, index) => ({
+            id: index,
+            text: res.text,
+            copyField: res.copyField,
+            severity: res.severity,
+            visible: true,
+          }))
+        );
       } else {
-        setSuccessVisible(false);
+        setFinalResults([]);
       }
     }
   }, [
     apiObject.isError,
-    apiObject.isSuccess,
     apiObject.isFetching,
     apiObject.isPending,
-    partialResults.length,
+    apiObject.isIdle,
+    allResults,
     errorsOnly,
   ]);
 
-  useEffect(() => {
-    if (apiObject.data && Array.isArray(apiObject.data)) {
-      setPartialResults(apiObject.data); // Simply set the new array
-    }
-  }, [apiObject.data]);
+  const handleCloseResult = (id) => {
+    setFinalResults((prev) => prev.map((r) => (r.id === id ? { ...r, visible: false } : r)));
+  };
 
+  const hasVisibleResults = finalResults.some((r) => r.visible);
   return (
     <>
+      {/* Loading alert */}
       {!errorsOnly && (
         <Collapse in={fetchingVisible}>
           <Alert
@@ -57,9 +141,7 @@ export const CippApiResults = (props) => {
                 aria-label="close"
                 color="inherit"
                 size="small"
-                onClick={() => {
-                  setFetchingVisible((prev) => !prev);
-                }}
+                onClick={() => setFetchingVisible(false)}
               >
                 <Close fontSize="inherit" />
               </IconButton>
@@ -73,6 +155,8 @@ export const CippApiResults = (props) => {
           </Alert>
         </Collapse>
       )}
+
+      {/* Error alert */}
       <Collapse in={errorVisible}>
         {apiObject.isError && (
           <Alert
@@ -84,9 +168,7 @@ export const CippApiResults = (props) => {
                 aria-label="close"
                 color="inherit"
                 size="small"
-                onClick={() => {
-                  setErrorVisible((prev) => !prev);
-                }}
+                onClick={() => setErrorVisible(false)}
               >
                 <Close fontSize="inherit" />
               </IconButton>
@@ -96,37 +178,37 @@ export const CippApiResults = (props) => {
           </Alert>
         )}
       </Collapse>
-      {!errorsOnly && (
-        <Collapse in={successVisible}>
-          {apiObject.data && (
-            <Alert
-              sx={alertSx}
-              variant="filled"
-              severity="success"
-              action={
-                <IconButton
-                  aria-label="close"
-                  color="inherit"
-                  size="small"
-                  onClick={() => {
-                    setSuccessVisible((prev) => !prev);
-                  }}
+
+      {/* Individual result alerts */}
+      {!errorsOnly && hasVisibleResults && (
+        <Grid container spacing={2}>
+          {finalResults.map((resultObj) => (
+            <Grid item xs={12} key={resultObj.id}>
+              <Collapse in={resultObj.visible}>
+                <Alert
+                  sx={alertSx}
+                  variant="filled"
+                  severity={resultObj.severity || "success"}
+                  action={
+                    <>
+                      <CippCopyToClipBoard text={resultObj.copyField || resultObj.text} />
+                      <IconButton
+                        aria-label="close"
+                        color="inherit"
+                        size="small"
+                        onClick={() => handleCloseResult(resultObj.id)}
+                      >
+                        <Close fontSize="inherit" />
+                      </IconButton>
+                    </>
+                  }
                 >
-                  <Close fontSize="inherit" />
-                </IconButton>
-              }
-            >
-              <ul>
-                {partialResults.map((result, index) => (
-                  <li key={index}>
-                    {result.Results} THIS API IS CURRENTLY RETURNING A SINGLE OBJECT MESSAGE AND
-                    NEEDS TO BE CHANGED TO RETURN AN ARRAY WITH OBJECTS: results, copyInfo
-                  </li>
-                ))}
-              </ul>
-            </Alert>
-          )}
-        </Collapse>
+                  {resultObj.text}
+                </Alert>
+              </Collapse>
+            </Grid>
+          ))}
+        </Grid>
       )}
     </>
   );

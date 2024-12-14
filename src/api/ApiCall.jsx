@@ -61,6 +61,14 @@ export function ApiGetCall(props) {
             onResult(response.data); // Emit each result as it arrives
           }
         }
+        if (relatedQueryKeys) {
+          const clearKeys = Array.isArray(relatedQueryKeys) ? relatedQueryKeys : [relatedQueryKeys];
+          setTimeout(() => {
+            clearKeys.forEach((key) => {
+              queryClient.invalidateQueries({ queryKey: [key] });
+            });
+          }, 1000);
+        }
         return results;
       } else {
         const response = await axios.get(url, {
@@ -70,24 +78,24 @@ export function ApiGetCall(props) {
             "Content-Type": "application/json",
           },
         });
+        if (onResult) {
+          onResult(response.data); // Emit each result as it arrives
+        }
+        if (relatedQueryKeys) {
+          const clearKeys = Array.isArray(relatedQueryKeys) ? relatedQueryKeys : [relatedQueryKeys];
+          setTimeout(() => {
+            clearKeys.forEach((key) => {
+              queryClient.invalidateQueries({ queryKey: [key] });
+            });
+          }, 1000);
+        }
         return response.data;
       }
     },
     staleTime: 600000, // 10 minutes
     refetchOnWindowFocus: false,
     retry: retryFn,
-    onSuccess: () => {
-      if (relatedQueryKeys) {
-        const clearKeys = Array.isArray(relatedQueryKeys) ? relatedQueryKeys : [relatedQueryKeys];
-        setTimeout(() => {
-          clearKeys.forEach((key) => {
-            queryClient.invalidateQueries({ queryKey: [key] });
-          });
-        }, 1000);
-      }
-    },
   });
-
   return queryInfo;
 }
 

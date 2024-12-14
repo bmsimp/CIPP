@@ -10,7 +10,7 @@ import CippFormComponent from "./CippFormComponent";
 
 export const CippApiDialog = (props) => {
   const { createDialog, title, fields, api, row, relatedQueryKeys, ...other } = props;
-  const router = useRouter(); // Use the Next.js router
+  const router = useRouter();
   const [addedFieldData, setAddedFieldData] = useState({});
   const [partialResults, setPartialResults] = useState([]);
   const [getRequestInfo, setGetRequestInfo] = useState({
@@ -22,6 +22,10 @@ export const CippApiDialog = (props) => {
       : api.relatedQueryKeys
       ? api.relatedQueryKeys
       : title,
+    bulkRequest: api.multiPost === false,
+    onResult: (result) => {
+      setPartialResults((prevResults) => [...prevResults, result]);
+    },
   });
 
   const actionPostRequest = ApiPostCall({
@@ -36,7 +40,6 @@ export const CippApiDialog = (props) => {
       setPartialResults((prevResults) => [...prevResults, result]);
     },
   });
-
   const actionGetRequest = ApiGetCall({
     ...getRequestInfo,
     relatedQueryKeys: relatedQueryKeys
@@ -44,6 +47,7 @@ export const CippApiDialog = (props) => {
       : api.relatedQueryKeys
       ? api.relatedQueryKeys
       : title,
+    bulkRequest: api.multiPost === false,
     onResult: (result) => {
       setPartialResults((prevResults) => [...prevResults, result]);
     },
@@ -90,7 +94,7 @@ export const CippApiDialog = (props) => {
           const value = singleRow[processedActionData[key]];
           elementData[key] = value !== undefined ? value : processedActionData[key];
         });
-        return { ...elementData, ...formData };
+        return { ...{ tenantFilter: tenantFilter }, ...elementData, ...formData };
       });
 
       if (action.type === "POST") {
@@ -169,8 +173,13 @@ export const CippApiDialog = (props) => {
     }
   }, [api.noConfirm]); // Run effect only when api.noConfirm changes
 
+  const handleClose = () => {
+    createDialog.handleClose();
+    setPartialResults([]);
+  };
+
   return (
-    <Dialog fullWidth maxWidth="sm" onClose={createDialog.handleClose} open={createDialog.open}>
+    <Dialog fullWidth maxWidth="sm" onClose={handleClose} open={createDialog.open}>
       <form onSubmit={formHook.handleSubmit(onSubmit)}>
         <DialogTitle>{title}</DialogTitle>
         <DialogContent>
@@ -197,7 +206,7 @@ export const CippApiDialog = (props) => {
           <CippApiResults apiObject={{ ...selectedType, data: partialResults }} />
         </DialogContent>
         <DialogActions>
-          <Button color="inherit" onClick={createDialog.handleClose}>
+          <Button color="inherit" onClick={() => handleClose()}>
             Close
           </Button>
           <Button variant="contained" type="submit">

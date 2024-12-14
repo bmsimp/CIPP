@@ -66,6 +66,7 @@ const Page = () => {
       label: "Set Per-User MFA",
       type: "POST",
       url: "/api/ExecPerUserMFA",
+      data: { userId: "userPrincipalName" },
       fields: [
         {
           type: "autoComplete",
@@ -79,7 +80,6 @@ const Page = () => {
           multiple: false,
         },
       ],
-      data: { userId: "userPrincipalName" },
       confirmText: "Are you sure you want to set per-user MFA for these users?",
       multiPost: false,
     },
@@ -106,7 +106,11 @@ const Page = () => {
       label: "Set Out of Office",
       type: "POST",
       url: "/api/ExecSetOoO",
-      data: { userId: "userPrincipalName", AutoReplyState: { value: "Enabled" } },
+      data: {
+        userId: "userPrincipalName",
+        AutoReplyState: { value: "Enabled" },
+        tenantFilter: "Tenant",
+      },
       fields: [{ type: "richText", name: "input", label: "Out of Office Message" }],
       confirmText: "Are you sure you want to set the out of office?",
       multiPost: false,
@@ -146,7 +150,7 @@ const Page = () => {
     },
     {
       label: "Disable Email Forwarding",
-      type: "POST",
+      type: "GET",
       url: "/api/ExecEmailForward",
       data: {
         username: "userPrincipalName",
@@ -159,7 +163,7 @@ const Page = () => {
     },
     {
       label: "Block Sign In",
-      type: "POST",
+      type: "GET",
       url: "/api/ExecDisableUser",
       data: { ID: "id" },
       confirmText: "Are you sure you want to block the sign-in for this user?",
@@ -167,7 +171,7 @@ const Page = () => {
     },
     {
       label: "Unblock Sign In",
-      type: "POST",
+      type: "GET",
       url: "/api/ExecDisableUser",
       data: { ID: "id", Enable: true },
       confirmText: "Are you sure you want to unblock sign-in for this user?",
@@ -175,11 +179,10 @@ const Page = () => {
     },
     {
       label: "Reset Password (Must Change)",
-      type: "POST",
+      type: "GET",
       url: "/api/ExecResetPass",
       data: {
         MustChange: true,
-
         ID: "id",
         displayName: "displayName",
       },
@@ -189,11 +192,10 @@ const Page = () => {
     },
     {
       label: "Reset Password",
-      type: "POST",
+      type: "GET",
       url: "/api/ExecResetPass",
       data: {
         MustChange: false,
-
         ID: "id",
         displayName: "displayName",
       },
