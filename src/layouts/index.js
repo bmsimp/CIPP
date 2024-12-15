@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useMediaQuery } from "@mui/material";
+import { Alert, Button, Dialog, DialogContent, DialogTitle, useMediaQuery } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { useSettings } from "../hooks/use-settings";
 import { Footer } from "./footer";
@@ -12,6 +12,9 @@ import { useDispatch } from "react-redux";
 import { showToast } from "../store/toasts";
 import { Box, Container, Grid } from "@mui/system";
 import { CippImageCard } from "../components/CippCards/CippImageCard";
+import Page from "../pages/onboarding";
+import { useDialog } from "../hooks/use-dialog";
+import { nativeMenuItems } from "/src/layouts/config";
 
 const SIDE_NAV_WIDTH = 270;
 const SIDE_NAV_PINNED_WIDTH = 50;
@@ -75,7 +78,42 @@ export const Layout = (props) => {
   const mobileNav = useMobileNav();
   const [userSettingsComplete, setUserSettingsComplete] = useState(false);
   const [fetchingVisible, setFetchingVisible] = useState([]);
+  const [menuItems, setMenuItems] = useState(nativeMenuItems);
   const currentTenant = settings?.currentTenant;
+  const currentRole = ApiGetCall({
+    url: "/.auth/me",
+    queryKey: "authmecipp",
+  });
+
+  useEffect(() => {
+    if (currentRole.isSuccess && !currentRole.isFetching) {
+      const userRoles = currentRole.data?.clientPrincipal?.userRoles;
+      if (!userRoles) {
+        return;
+      }
+      const filterItemsByRole = (items) => {
+        return items
+          .map((item) => {
+            if (item.roles && item.roles.length > 0) {
+              const hasRole = item.roles.some((requiredRole) => userRoles.includes(requiredRole));
+              if (!hasRole) {
+                return null;
+              }
+            }
+            if (item.items && item.items.length > 0) {
+              const filteredSubItems = filterItemsByRole(item.items).filter(Boolean);
+              return { ...item, items: filteredSubItems };
+            }
+
+            return item;
+          })
+          .filter(Boolean);
+      };
+
+      const filteredMenu = filterItemsByRole(nativeMenuItems);
+      setMenuItems(filteredMenu);
+    }
+  }, [currentRole.isSuccess]);
 
   const handleNavPin = useCallback(() => {
     settings.handleUpdate({
@@ -127,6 +165,7 @@ export const Layout = (props) => {
     }
   }, [alertsAPI.isSuccess, alertsAPI.data, alertsAPI.isFetching]);
   const [setupCompleted, setSetupCompleted] = useState(true);
+  const createDialog = useDialog();
   const dispatch = useDispatch();
   useEffect(() => {
     if (alertsAPI.isSuccess && !alertsAPI.isFetching) {
@@ -142,8 +181,6 @@ export const Layout = (props) => {
         });
       }
     }
-
-    //if any of the alerts have the property setupCompleted === false, open a dialog with the SAM wizard in there.
     if (alertsAPI.isSuccess && !alertsAPI.isFetching) {
       if (alertsAPI.data.length > 0) {
         const setupCompleted = alertsAPI.data.find((alert) => alert.setupCompleted === false);
@@ -153,11 +190,14 @@ export const Layout = (props) => {
       }
     }
   }, [alertsAPI.isSuccess]);
+
   return (
     <>
       <TopNav onNavOpen={mobileNav.handleOpen} openNav={mobileNav.open} />
-      {mdDown && <MobileNav onClose={mobileNav.handleClose} open={mobileNav.open} />}
-      {!mdDown && <SideNav onPin={handleNavPin} pinned={!!settings.pinNav} />}
+      {mdDown && (
+        <MobileNav items={menuItems} onClose={mobileNav.handleClose} open={mobileNav.open} />
+      )}
+      {!mdDown && <SideNav items={menuItems} onPin={handleNavPin} pinned={!!settings.pinNav} />}
       <LayoutRoot
         sx={{
           pl: {
@@ -183,7 +223,30 @@ export const Layout = (props) => {
               </Container>
             </Box>
           ) : (
-            children
+            <>
+              <Dialog
+                fullWidth
+                maxWidth="lg"
+                onClose={createDialog.handleClose}
+                open={createDialog.open}
+              >
+                <DialogTitle>Setup Wizard</DialogTitle>
+                <DialogContent>
+                  <Page />
+                </DialogContent>
+              </Dialog>
+              {!setupCompleted && (
+                <Box sx={{ flexGrow: 1, py: 2 }}>
+                  <Container maxWidth={false}>
+                    <Alert severity="info">
+                      Setup has not been completed.
+                      <Button onClick={createDialog.handleOpen}>Start Wizard</Button>
+                    </Alert>
+                  </Container>
+                </Box>
+              )}
+              {children}
+            </>
           )}
           <Footer />
         </LayoutContainer>

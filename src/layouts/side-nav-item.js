@@ -17,15 +17,17 @@ export const SideNavItem = (props) => {
     openImmediately = false,
     path,
     title,
-    type = "item",
   } = props;
+
   const [open, setOpen] = useState(openImmediately);
 
   const handleToggle = useCallback(() => {
     setOpen((prevOpen) => !prevOpen);
   }, []);
 
-  // Branch
+  // Dynamic spacing and font sizing based on depth
+  const indent = depth > 0 ? depth * 1.5 : 1; // adjust multiplication factor as needed
+  const fontSize = depth === 0 ? 14 : 13; // top-level 14, nested 13
 
   if (children) {
     return (
@@ -37,75 +39,63 @@ export const SideNavItem = (props) => {
             borderRadius: 1,
             display: "flex",
             fontFamily: (theme) => theme.typography.fontFamily,
-            fontSize: 14,
+            fontSize: fontSize,
             fontWeight: 500,
             justifyContent: "flex-start",
-            px: "6px",
+            px: `${indent * 6}px`,
             py: "12px",
             textAlign: "left",
             whiteSpace: "nowrap",
             width: "100%",
           }}
         >
-          {type === "header" ? (
-            <>
-              <Box
-                sx={{ color: "neutral.400", fontSize: 12, fontWeight: 500, px: "6px", py: "12px" }}
-              >
-                {title}
-              </Box>
-            </>
-          ) : (
-            <>
-              <Box
-                component="span"
-                sx={{
-                  alignItems: "center",
-                  color: "neutral.400",
-                  display: "inline-flex",
-                  flexGrow: 0,
-                  flexShrink: 0,
-                  height: 24,
-                  justifyContent: "center",
-                  width: 24,
-                }}
-              >
-                {icon}
-              </Box>
-              <Box
-                component="span"
-                sx={{
-                  color: depth === 0 ? "text.primary" : "text.secondary",
-                  flexGrow: 1,
-                  fontSize: 14,
-                  mx: "12px",
-                  transition: "opacity 250ms ease-in-out",
-                  ...(active && {
-                    color: "primary.main",
-                  }),
-                  ...(collapse && {
-                    opacity: 0,
-                  }),
-                }}
-              >
-                {title}
-              </Box>
-              <SvgIcon
-                sx={{
-                  color: "neutral.500",
-                  fontSize: 16,
-                  transition: "opacity 250ms ease-in-out",
-                  ...(collapse && {
-                    opacity: 0,
-                  }),
-                }}
-              >
-                {open ? <ChevronDownIcon /> : <ChevronRightIcon />}
-              </SvgIcon>
-            </>
-          )}
+          <Box
+            component="span"
+            sx={{
+              alignItems: "center",
+              color: "neutral.400",
+              display: "inline-flex",
+              flexGrow: 0,
+              flexShrink: 0,
+              height: 24,
+              justifyContent: "center",
+              width: 24,
+            }}
+          >
+            {icon}
+          </Box>
+          <Box
+            component="span"
+            sx={{
+              color: depth === 0 ? "text.primary" : "text.secondary",
+              flexGrow: 1,
+              fontSize: fontSize,
+              mx: "12px",
+              transition: "opacity 250ms ease-in-out",
+              ...(active && {
+                color: "primary.main",
+              }),
+              ...(collapse && {
+                opacity: 0,
+              }),
+            }}
+          >
+            {title}
+          </Box>
+          <SvgIcon
+            sx={{
+              color: "neutral.500",
+              fontSize: 16,
+              transition: "opacity 250ms ease-in-out",
+              ...(collapse && {
+                opacity: 0,
+              }),
+            }}
+          >
+            {open ? <ChevronDownIcon /> : <ChevronRightIcon />}
+          </SvgIcon>
         </ButtonBase>
-        <Collapse in={type === "header" || (!collapse && open)} unmountOnExit>
+        <Collapse in={!collapse && open} unmountOnExit>
           {children}
         </Collapse>
       </li>
@@ -113,7 +103,6 @@ export const SideNavItem = (props) => {
   }
 
   // Leaf
-
   const linkProps = path
     ? external
       ? {
@@ -135,10 +124,10 @@ export const SideNavItem = (props) => {
           borderRadius: 1,
           display: "flex",
           fontFamily: (theme) => theme.typography.fontFamily,
-          fontSize: 14,
+          fontSize: fontSize,
           fontWeight: 500,
           justifyContent: "flex-start",
-          px: "6px",
+          px: `${indent * 6}px`,
           py: "12px",
           textAlign: "left",
           whiteSpace: "nowrap",
@@ -207,5 +196,4 @@ SideNavItem.propTypes = {
   openImmediately: PropTypes.bool,
   path: PropTypes.string,
   title: PropTypes.string.isRequired,
-  type: PropTypes.string,
 };
