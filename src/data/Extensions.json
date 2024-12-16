@@ -33,6 +33,7 @@
     "logoDark": "/assets/integrations/sherweb_dark.png",
     "description": "Enable the Sherweb integration to manage your CSP licensing from CIPP.",
     "helpText": "This integration allows you to manage your CSP licensing from CIPP. Purchase new licenses while adding or editing users in CIPP. Not a Sherweb partner? Sign up for the Sherweb Cloud Services for MSPs program.",
+    "mappingRequired": true,
     "links": [
       {
         "name": "Sherweb Cloud Services for MSPs",
@@ -52,8 +53,14 @@
         "placeholder": "Enter your Sherweb Client ID"
       },
       {
+        "type": "textField",
+        "name": "Sherweb.SubscriptionKey",
+        "label": "Subscription Key",
+        "placeholder": "Enter your Sherweb Subscription Key"
+      },
+      {
         "type": "password",
-        "name": "Sherweb.clientSecret",
+        "name": "Sherweb.APIKey",
         "label": "Client Secret",
         "placeholder": "Enter your Sherweb Client Secret"
       },

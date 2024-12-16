@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader } from "@mui/material";
+import { Card, CardContent, CardHeader, Skeleton } from "@mui/material";
 import { Grid } from "@mui/system";
 import dynamic from "next/dynamic";
 import { ApiPostCall } from "/src/api/ApiCall";
@@ -10,10 +10,15 @@ const CippMap = dynamic(() => import("./CippMap"), { ssr: false });
 
 export default function CippGeoLocation({ ipAddress, cardProps }) {
   const [locationInfo, setLocationInfo] = useState(null);
-  const [properties, setProperties] = useState([]);
 
   const markerProperties = ["timezone", "as", "proxy", "hosting", "mobile"];
   const includeProperties = ["org", "city", "region", "country", "zip"];
+  const initialPropertyList = includeProperties.map((key) => ({
+    label: getCippTranslation(key),
+    value: "",
+  }));
+
+  const [properties, setProperties] = useState(initialPropertyList);
 
   const [markerPopupContents, setMarkerPopupContents] = useState(null);
 
@@ -35,8 +40,7 @@ export default function CippGeoLocation({ ipAddress, cardProps }) {
         <div>
           {markerProperties.map((key) => (
             <div key={key}>
-              <strong>{getCippTranslation(key)}:</strong>{" "}
-              {getCippFormatting(locationInfo[key], key)}
+              <strong>{getCippTranslation(key)}:</strong> {getCippFormatting(result[key], key)}
             </div>
           ))}
         </div>
@@ -56,25 +60,31 @@ export default function CippGeoLocation({ ipAddress, cardProps }) {
   }, [ipAddress]);
 
   return (
-    <Card {...cardProps}>
-      <CardHeader title={`Location Info for ${ipAddress}`} />
-      <CardContent>
-        <Grid container spacing={2}>
-          <Grid item size={{ xs: 12, sm: 8 }}>
+    <Grid container spacing={2}>
+      <Grid item size={{ xs: 12, sm: 8 }}>
+        {geoLookup.isPending ? (
+          <Skeleton variant="rectangular" height={400} />
+        ) : (
+          <>
             {locationInfo && locationInfo.lat && locationInfo.lon && (
               <CippMap
-                position={[locationInfo.lat, locationInfo.lon]}
+                markers={[
+                  { position: [locationInfo.lat, locationInfo.lon], popup: markerPopupContents },
+                ]}
                 zoom={11}
-                markerPopupContents={markerPopupContents}
                 mapSx={{ height: "400px", width: "100%" }}
               />
             )}
-          </Grid>
-          <Grid item size={{ xs: 12, sm: 4 }}>
-            <CippPropertyList propertyItems={properties} showDivider={false} />
-          </Grid>
-        </Grid>
-      </CardContent>
-    </Card>
+          </>
+        )}
+      </Grid>
+      <Grid item size={{ xs: 12, sm: 4 }}>
+        <CippPropertyList
+          propertyItems={properties}
+          showDivider={false}
+          isFetching={geoLookup.isPending}
+        />
+      </Grid>
+    </Grid>
   );
 }
