@@ -6,6 +6,9 @@ rules:
   - base: dev
     upstream: KelvinTegelaar:dev
     mergeMethod: merge
-  - base: website
-    upstream: KelvinTegelaar:website
+  - base: docs
+    upstream: KelvinTegelaar:docs
+    mergeMethod: merge
+  - base: interface-rewrite
+    upstream: KelvinTegelaar:interface-rewrite
     mergeMethod: merge
