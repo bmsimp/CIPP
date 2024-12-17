@@ -18,7 +18,7 @@ import { getCippRoleTranslation } from "./get-cipp-role-translation";
 import { CogIcon, ServerIcon, UserIcon, UsersIcon } from "@heroicons/react/24/outline";
 import { getCippTranslation } from "./get-cipp-translation";
 
-export const getCippFormatting = (data, cellName, type) => {
+export const getCippFormatting = (data, cellName, type, canReceive) => {
   const isText = type === "text";
   const cellNameLower = cellName.toLowerCase();
   // if data is a data object, return a formatted date
@@ -79,7 +79,11 @@ export const getCippFormatting = (data, cellName, type) => {
     "CreationTime",
   ];
   if (timeAgoArray.includes(cellName)) {
-    return isText ? new Date(data).toLocaleDateString() : <CippTimeAgo data={data} type={type} />;
+    return isText && canReceive !== "both" ? (
+      new Date(data)
+    ) : (
+      <CippTimeAgo data={data} type={type} />
+    );
   }
 
   const passwordItems = ["password", "applicationsecret", "refreshtoken"];
@@ -267,7 +271,11 @@ export const getCippFormatting = (data, cellName, type) => {
 
   // Handle CIPPAction property
   if (cellName === "CIPPAction") {
-    var actions = JSON.parse(data);
+    try {
+      var actions = JSON.parse(data);
+    } catch (e) {
+      actions = data;
+    }
     if (!Array.isArray(actions)) {
       actions = [actions];
     }
@@ -278,13 +286,15 @@ export const getCippFormatting = (data, cellName, type) => {
         ));
   }
 
-  // Handle AuditRecord property
-  if (cellName === "AuditRecord") {
-    return isText ? (
-      data
-    ) : (
-      <CippDataTableButton data={JSON.parse(data)} tableTitle={getCippTranslation(cellName)} />
-    );
+  // if data is a json string, parse it and return a table
+  if (typeof data === "string" && (data.startsWith("{") || data.startsWith("["))) {
+    try {
+      return isText ? (
+        JSON.stringify(JSON.parse(data))
+      ) : (
+        <CippDataTableButton data={JSON.parse(data)} tableTitle={getCippTranslation(cellName)} />
+      );
+    } catch (e) {}
   }
 
   if (cellName === "key") {
