@@ -112,7 +112,7 @@ const CippStandardAccordion = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedValues, standards, selectedStandards]);
 
-  return Object.keys(selectedStandards).map((standardName) => {
+  return Object.keys(selectedStandards)?.map((standardName) => {
     const standard = standards.find((s) => s.name === standardName.split("[")[0]);
     if (!standard) return null;
 
@@ -121,7 +121,12 @@ const CippStandardAccordion = ({
     const isConfigured = configuredState[standardName];
     const disabledFeatures = standard.disabledFeatures || {};
 
-    const selectedActions = _.get(watchedValues, `${standardName}.action`);
+    let selectedActions = _.get(watchedValues, `${standardName}.action`);
+    //if selectedActions is not an array, convert it to an array
+    if (selectedActions && !Array.isArray(selectedActions)) {
+      selectedActions = [selectedActions];
+    }
+
     const selectedTemplateName = standard.multiple
       ? _.get(watchedValues, `${standardName}.${standard.addedComponent?.[0]?.name}`)
       : "";
@@ -152,7 +157,7 @@ const CippStandardAccordion = ({
               <Typography variant="h6">{accordionTitle}</Typography>
               {selectedActions && selectedActions?.length > 0 && (
                 <Stack direction="row" spacing={1} sx={{ my: 0.5 }}>
-                  {selectedActions.map((action, index) => (
+                  {selectedActions?.map((action, index) => (
                     <Chip
                       key={index}
                       label={action.label}
@@ -217,7 +222,7 @@ const CippStandardAccordion = ({
               {hasAddedComponents && (
                 <Grid item xs={8}>
                   <Grid container spacing={2}>
-                    {standard.addedComponent.map((component, idx) => (
+                    {standard.addedComponent?.map((component, idx) => (
                       <CippAddedComponent
                         key={idx}
                         standardName={standardName}
