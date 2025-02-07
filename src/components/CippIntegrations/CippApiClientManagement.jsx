@@ -118,6 +118,7 @@ const CippApiClientManagement = () => {
         Action: "ResetSecret",
         ClientId: "ClientId",
       },
+      hideBulk: true,
     },
     {
       label: "Copy API Scope",
@@ -127,6 +128,7 @@ const CippApiClientManagement = () => {
         var scope = `api://${row.ClientId}/.default`;
         navigator.clipboard.writeText(scope);
       },
+      hideBulk: true,
     },
     {
       label: "Delete Client",
@@ -146,6 +148,7 @@ const CippApiClientManagement = () => {
         },
       ],
       relatedQueryKeys: ["ApiClients"],
+      multiPost: false,
     },
   ];
 
@@ -190,7 +193,12 @@ const CippApiClientManagement = () => {
                   </SvgIcon>
                   <ListItemText>Add Existing Client</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => azureConfig.refetch()}>
+                <MenuItem
+                  onClick={() => {
+                    azureConfig.refetch();
+                    handleMenuClose();
+                  }}
+                >
                   <SvgIcon fontSize="small" sx={{ minWidth: "30px" }}>
                     <Sync />
                   </SvgIcon>
@@ -206,7 +214,10 @@ const CippApiClientManagement = () => {
             </>
           }
           propertyItems={[
-            { label: "API Auth Enabled", value: azureConfig.data?.Results?.Enabled },
+            {
+              label: "Microsoft Authentication Enabled",
+              value: azureConfig.data?.Results?.Enabled,
+            },
             {
               label: "API Url",
               value: azureConfig.data?.Results?.ApiUrl ? (
@@ -226,12 +237,20 @@ const CippApiClientManagement = () => {
                 "Not Available"
               ),
             },
+            {
+              label: "Tenant ID",
+              value: azureConfig.data?.Results?.TenantID ? (
+                <CippCopyToClipBoard type="chip" text={azureConfig.data?.Results?.TenantID} />
+              ) : (
+                "Not Available"
+              ),
+            },
           ]}
           layout="dual"
           showDivider={false}
           isFetching={azureConfig.isFetching}
         />
-        {azureConfig.isSuccess && Array.isArray(azureConfig.data?.Results?.ClientIDs) && (
+        {azureConfig.isSuccess && azureConfig.data?.Results?.ClientIDs && (
           <>
             {!isEqual(
               apiClients.data?.pages?.[0]?.Results?.filter((c) => c.Enabled)
@@ -248,8 +267,15 @@ const CippApiClientManagement = () => {
             )}
           </>
         )}
-        {}
-        <Box>
+        {azureConfig.isSuccess && azureConfig.data?.Results?.Enabled === false && (
+          <Box sx={{ px: 3 }}>
+            <Alert severity="warning">
+              Microsoft Authentication is disabled. Configure API Clients and click Actions &gt;
+              Save Azure Configuration.
+            </Alert>
+          </Box>
+        )}
+        <Box sx={{ px: 3 }}>
           <CippApiResults apiObject={postCall} />
         </Box>
         <CippDataTable
