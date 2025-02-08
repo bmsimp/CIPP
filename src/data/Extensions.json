@@ -322,6 +322,17 @@
         "type": "switch",
         "name": "Hudu.MonitorDomains",
         "label": "Monitor domains in Hudu"
+      },
+      {
+        "_comment": "I have added this switch as a logic check for the Hudu integration script to check against when CIPP first connects to the Hudu Instance via Connect-HuduAPI.ps1",
+        "type": "switch",
+        "name": "Hudu.CFEnabled",
+        "label": "Connect to HUDU through CloudFlare Tunnel with the Service Account credentials.",
+        "condition": {
+          "field": "CFZTNA.Enabled",
+          "compareType": "is",
+          "compareValue": true
+        }
       }
     ],
     "mappingRequired": true,
@@ -337,7 +348,7 @@
     "logoDark": "/assets/integrations/pwpush_dark.png",
     "forceSyncButton": false,
     "description": "Enable the PasswordPusher integration to generate password links instead of plain text passwords.",
-    "helpText": "This integration allows you to generate password links instead of plain text passwords. Configure authentication and expiration settings that will apply to all generated passwords. If you are a PWPush Pro customer and utilizing custom domains, please do not enter your custom domain in the Base URL field.",
+    "helpText": "This integration allows you to generate password links instead of plain text passwords. Configure authentication and expiration settings that will apply to all generated passwords. If you are a Hosted PWPush Pro customer you can also select an account for branding if you enable Bearer Authentication. Self-Hosted must use the Email Address and API Key method for authenticated pushes.",
     "links": [
       {
         "name": "PWPush Documentation",
@@ -352,12 +363,12 @@
       {
         "type": "switch",
         "name": "PWPush.Enabled",
-        "label": "Enable Integration - Replace passwords with PWPush links"
+        "label": "Enable Integration"
       },
       {
         "type": "switch",
-        "name": "PWPush.PWPushPro",
-        "label": "PWPush Pro/Premium account"
+        "name": "PWPush.UseBearerAuth",
+        "label": "Use Bearer Authentication (Hosted only)"
       },
       {
         "type": "textField",
@@ -366,22 +377,28 @@
         "placeholder": "Enter your PWPush URL. (default: https://pwpush.com)"
       },
       {
-        "type": "textField",
-        "name": "PWPush.EmailAddress",
-        "label": "PWPush email address",
-        "placeholder": "Enter your email address for PWPush. (Free/Self-Hosted only)"
-      },
-      {
         "type": "password",
         "name": "PWPush.APIKey",
         "label": "PWPush API Key",
         "placeholder": "Enter your PWPush API Key. (optional)"
       },
       {
+        "type": "textField",
+        "name": "PWPush.EmailAddress",
+        "label": "PWPush email address",
+        "placeholder": "Enter your email address for PWPush. (Email & API Key auth)",
+        "condition": {
+          "field": "PWPush.UseBearerAuth",
+          "compareType": "is",
+          "compareValue": false
+        }
+      },
+      {
         "type": "autoComplete",
         "name": "PWPush.AccountId",
-        "label": "Select your PWPush Account for branding (Pro/Premium only)",
+        "label": "Select your PWPush Account for branding (Pro/Premium only, optional with Custom Domain)",
         "multiple": false,
+        "creatable": false,
         "api": {
           "url": "/api/ExecExtensionMapping?List=PWPushFields",
           "queryKey": "PWPushAccounts",
@@ -391,12 +408,11 @@
           "showRefresh": true
         },
         "condition": {
-          "field": "PWPush.PWPushPro",
+          "field": "PWPush.UseBearerAuth",
           "compareType": "is",
           "compareValue": true
         }
       },
-
       {
         "type": "number",
         "name": "PWPush.ExpireAfterDays",
@@ -454,7 +470,7 @@
   },
   {
     "name": "CloudFlare ZTNA Tunnel",
-    "id": "CTZTNA",
+    "id": "CFZTNA",
     "type": "ztna",
     "cat": "Zero Trust Network Tunnel",
     "logo": "/assets/integrations/cloudflare.png",
@@ -474,20 +490,19 @@
     ],
     "SettingOptions": [
       {
+        "type": "switch",
+        "name": "CFZTNA.Enabled",
+        "label": "Enable Integration"
+      },
+      {
         "type": "password",
-        "name": "CloudFlareClientID.APIKey",
+        "name": "CFZTNA.ClientID",
         "label": "CloudFlare Tunnel Service Account Client ID"
       },
       {
         "type": "password",
-        "name": "CloudFlareAPIKey.APIKey",
+        "name": "CFZTNA.APIKey",
         "label": "CloudFlare Tunnel Service Account Client Secret"
-      },
-      {
-        "_comment": "I have added this switch as a logic check for the Hudu integration script to check against when CIPP first connects to the Hudu Instance via Connect-HuduAPI.ps1",
-        "type": "switch",
-        "name": "Hudu.CFEnabled",
-        "label": " Connect to HUDU through CloudFlare Tunnel with the above Service Account credentials."
       }
     ],
     "mappingRequired": false
