@@ -43,7 +43,7 @@ const Page = () => {
   const actions = [
     {
       label: "View Templates",
-      link: "/tools/community-repos/repo?name=[FullName]",
+      link: "/tools/community-repos/repo?name=[FullName]&branch=[DefaultBranch]",
       icon: <OpenInNew />,
     },
     {
@@ -82,13 +82,12 @@ const Page = () => {
     searchMutation.mutate({
       url: "/api/ExecGitHubAction",
       data: {
-        Search: {
-          Repository: repo ? repo : "",
-          User: user ? user : "",
-          Org: org ? org : "",
-          SearchTerm: searchTerms,
-          Type: "repositories",
-        },
+        Action: "Search",
+        Repository: repo ? repo : "",
+        User: user ? user : "",
+        Org: org ? org : "",
+        SearchTerm: searchTerms,
+        Type: "repositories",
       },
     });
   };
