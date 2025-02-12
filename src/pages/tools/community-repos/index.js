@@ -27,7 +27,7 @@ import { Radio, RadioGroup, FormControlLabel } from "@mui/material";
 import { CippFormCondition } from "/src/components/CippComponents/CippFormCondition";
 import AddIcon from "@mui/icons-material/Add";
 import { Box } from "@mui/system";
-import { Add, OpenInNew } from "@mui/icons-material";
+import { Add, ForkLeft, OpenInNew } from "@mui/icons-material";
 import { CippApiResults } from "/src/components/CippComponents/CippApiResults";
 import { ApiGetCall } from "../../../api/ApiCall";
 import NextLink from "next/link";
@@ -39,6 +39,28 @@ const Page = () => {
   const [repo, setRepo] = useState("");
   const [user, setUser] = useState("");
   const [org, setOrg] = useState("");
+  const [openCreate, setOpenCreate] = useState(false);
+  const createForm = useForm({ mode: "onChange", defaultValues: { Type: "user" } });
+
+  const createMutation = ApiPostCall({
+    urlFromData: true,
+    relatedQueryKeys: ["CommunityRepos"],
+  });
+
+  const handleCreateRepo = (values) => {
+    console.log(values);
+    createMutation.mutate({
+      url: "/api/ExecGitHubAction",
+      data: {
+        Action: "CreateRepo",
+        Type: values.type,
+        Name: values.repoName,
+        Org: values.orgName?.value,
+        Description: values.Description,
+        Private: values.Private,
+      },
+    });
+  };
 
   const actions = [
     {
@@ -56,19 +78,53 @@ const Page = () => {
       multiPost: false,
       queryKey: "CommunityRepos",
     },
+    {
+      label: "Set Upload Branch",
+      type: "POST",
+      url: "/api/ExecCommunityRepo",
+      data: { Action: "SetBranch", Id: "Id" },
+      icon: <ForkLeft />,
+      fields: [
+        {
+          type: "select",
+          name: "Branch",
+          label: "Branch",
+          api: {
+            url: "/api/ExecGitHubAction",
+            type: "GET",
+            data: {
+              Action: "GetBranches",
+              FullName: "FullName",
+            },
+            dataKey: "Results",
+            labelField: "name",
+            valueField: "name",
+            processFieldData: true,
+          },
+        },
+      ],
+      hideBulk: true,
+      confirmText: "Are you sure you want to set the branch for this repository?",
+      condition: (row) => row.WriteAccess === true,
+    },
   ];
 
   const offCanvas = {
-    extendedInfoFields: ["Owner", "Name", "Description", "URL", "Visibility", "Permissions"],
+    extendedInfoFields: [
+      "Owner",
+      "Name",
+      "Description",
+      "URL",
+      "Visibility",
+      "DefaultBranch",
+      "UploadBranch",
+      "Permissions",
+    ],
     actions: actions,
   };
 
-  const integrations = ApiGetCall({
-    url: "/api/ListExtensionsConfig",
-    queryKey: "Integrations",
-  });
-
   const searchMutation = ApiPostCall({
+    urlFromData: true,
     onResult: (resp) => {
       setResults(resp?.Results || []);
     },
@@ -109,32 +165,97 @@ const Page = () => {
       <CippTablePage
         title="Community Repositories"
         tenantInTitle={false}
-        tableFilter={
-          <>
-            {integrations.isSuccess && !integrations.data?.GitHub?.Enabled && (
-              <Alert severity="info">
-                The community repositories feature requires the GitHub Integration to be enabled. Go
-                to the{" "}
-                <Link component={NextLink} href={"/cipp/integrations/configure?id=GitHub"}>
-                  GitHub Integration
-                </Link>{" "}
-                page to enable it.
-              </Alert>
-            )}
-          </>
-        }
         apiUrl="/api/ListCommunityRepos"
         apiDataKey="Results"
         queryKey="CommunityRepos"
         actions={actions}
         offCanvas={offCanvas}
-        simpleColumns={["Name", "Owner", "URL", "Visibility", "WriteAccess"]}
+        simpleColumns={["Name", "Owner", "URL", "Visibility", "WriteAccess", "UploadBranch"]}
         cardButton={
-          <Button onClick={() => setOpenSearch(true)} startIcon={<Add />}>
-            Add Repo
-          </Button>
+          <>
+            <Button onClick={() => setOpenSearch(true)} startIcon={<Add />}>
+              Add Repo
+            </Button>
+            <Button onClick={() => setOpenCreate(true)} startIcon={<Add />}>
+              Create Repo
+            </Button>
+          </>
         }
       />
+      <Dialog fullWidth maxWidth="md" open={openCreate} onClose={() => setOpenCreate(false)}>
+        <DialogTitle>Create New Repository</DialogTitle>
+        <DialogContent>
+          <FormProvider {...createForm}>
+            <RadioGroup
+              row
+              value={createForm.watch("Type")}
+              onChange={(e) => {
+                createForm.setValue("Type", e.target.value);
+              }}
+            >
+              <FormControlLabel value="user" control={<Radio />} label="User" />
+              <FormControlLabel value="org" control={<Radio />} label="Org" />
+            </RadioGroup>
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              <CippFormCondition
+                field="Type"
+                compareType="is"
+                compareValue="org"
+                formControl={createForm}
+              >
+                <CippFormComponent
+                  type="autoComplete"
+                  name="orgName"
+                  formControl={createForm}
+                  label="Organization"
+                  api={{
+                    url: "/api/ExecGitHubAction",
+                    data: {
+                      Action: "GetOrgs",
+                    },
+                    queryKey: "GitHubOrgs",
+                    dataKey: "Results",
+                    labelField: "login",
+                    valueField: "login",
+                  }}
+                  multiple={false}
+                />
+              </CippFormCondition>
+              <CippFormComponent
+                type="textField"
+                name="repoName"
+                label="Repository Name"
+                formControl={createForm}
+              />
+              <CippFormComponent
+                type="textField"
+                name="Description"
+                label="Description"
+                formControl={createForm}
+              />
+              <CippFormComponent
+                type="switch"
+                name="Private"
+                label="Private"
+                formControl={createForm}
+              />
+            </Stack>
+          </FormProvider>
+          <CippApiResults apiObject={createMutation} />
+        </DialogContent>
+        <DialogActions>
+          <Button variant="outlined" onClick={() => setOpenCreate(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            type="submit"
+            onClick={createForm.handleSubmit(handleCreateRepo)}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog fullWidth maxWidth="md" open={openSearch} onClose={() => setOpenSearch(false)}>
         <DialogTitle>Add Community Repositories from GitHub</DialogTitle>
         <DialogContent>
