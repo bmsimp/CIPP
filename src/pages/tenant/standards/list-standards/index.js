@@ -9,7 +9,10 @@ import { CippApiResults } from "../../../../components/CippComponents/CippApiRes
 
 const Page = () => {
   const oldStandards = ApiGetCall({ url: "/api/ListStandards", queryKey: "ListStandards-legacy" });
-
+  const integrations = ApiGetCall({
+    url: "/api/ListExtensionsConfig",
+    queryKey: "Integrations",
+  });
   const pageTitle = "Standard Templates";
   const actions = [
     {
@@ -75,7 +78,7 @@ const Page = () => {
             labelField: "FullName",
           },
           multiple: false,
-          createable: false,
+          creatable: false,
           required: true,
           validators: {
             required: { value: true, message: "This field is required" },
@@ -92,6 +95,7 @@ const Page = () => {
         },
       ],
       confirmText: "Are you sure you want to save this template to the selected repository?",
+      condition: () => integrations.isSuccess && integrations?.data?.GitHub.Enabled,
     },
     {
       label: "Delete Template",
