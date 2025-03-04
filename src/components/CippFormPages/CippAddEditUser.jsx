@@ -64,7 +64,7 @@ const CippAddEditUser = (props) => {
           InputProps={{
             endAdornment: <InputAdornment position="end">@</InputAdornment>,
           }}
-          name="mailNickname"
+          name="username"
           formControl={formControl}
         />
       </Grid>
@@ -291,6 +291,17 @@ const CippAddEditUser = (props) => {
           multiple={false}
         />
       </Grid>
+      {userSettingsDefaults?.userAttributes?.some((attribute) => attribute.value === "sponsor") && (
+        <Grid item xs={12}>
+          <CippFormUserSelector
+            formControl={formControl}
+            name="setSponsor"
+            label="Set Sponsor"
+            valueField="userPrincipalName"
+            multiple={false}
+          />
+        </Grid>
+      )}
       <Grid item xs={12}>
         <CippFormUserSelector
           formControl={formControl}
