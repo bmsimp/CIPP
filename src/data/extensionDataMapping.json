@@ -35,9 +35,9 @@
     "type": "array",
     "targetObject": "user",
     "sourceMatchProperty": "Identity",
-    "destinationMatchProperty": "id",
+    "destinationMatchProperty": ["id", "mailNickname"],
     "storeAs": "json",
-    "select": "Identity,User,AccessRights,IsInherited,Deny,InheritanceType,UserSid,IsOwner"
+    "select": "User,AccessRights"
   },
   "CASMailbox": {
     "description": "List of CAS mailboxes mapped to their corresponding user via id. Properties can be mapped individually.",
