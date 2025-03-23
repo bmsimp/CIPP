@@ -49,7 +49,7 @@ export const CippGdapActions = () => [
     icon: <AdminPanelSettings />,
   },
   {
-    label: "Reset Group Mappings",
+    label: "Reset Role Mapping",
     type: "POST",
     url: "/api/ExecGDAPAccessAssignment",
     icon: <LockReset />,
@@ -68,17 +68,33 @@ export const CippGdapActions = () => [
           labelField: "TemplateId",
           showRefresh: true,
         },
+        required: true,
+        validators: {
+          validate: (value) => {
+            if (!value) {
+              return "Role Template is required";
+            }
+            return true;
+          },
+        },
       },
     ],
     confirmText: (
       <>
         <Typography variant="body1">
-          Are you sure you want to reset the group mappings for this relationship?
+          Are you sure you want to reset the role mappings for this relationship?
         </Typography>
         <Alert severity="warning">
-          This action will remove all existing group mappings and apply the selected role template
-          to the relationship. Use this to fix incorrect group mappings or permission overlap issues
-          (e.g removing AdminAgents or HelpdeskAgents).
+          Resetting GDAP role mappings will perform the following actions:
+          <ul style={{ paddingLeft: "15px" }}>
+            <li>Remove groups assignments that are not part of the Role Template</li>
+            <li>Update existing group assignments to match the Role Template</li>
+            <li>Create new group assignments based on the Role Template</li>
+          </ul>
+        </Alert>
+        <Alert severity="info">
+          This is useful for fixing GDAP relationships that have overlapping roles or incorrect
+          group assignments (e.g. using AdminAgents or HelpdeskAgents).
         </Alert>
       </>
     ),
