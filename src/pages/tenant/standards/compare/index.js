@@ -10,9 +10,20 @@ import {
   Chip,
   Skeleton,
   Alert,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import { Layout as DashboardLayout } from "/src/layouts/index.js";
-import { PlayArrow, CheckCircle, Cancel, Info, Public, Microsoft } from "@mui/icons-material";
+import {
+  PlayArrow,
+  CheckCircle,
+  Cancel,
+  Info,
+  Public,
+  Microsoft,
+  Description,
+  Sync,
+} from "@mui/icons-material";
 import { ArrowLeftIcon } from "@mui/x-date-pickers";
 import CippFormComponent from "/src/components/CippComponents/CippFormComponent";
 import standards from "/src/data/standards.json";
@@ -25,6 +36,8 @@ import { ApiGetCall, ApiPostCall } from "../../../../api/ApiCall";
 import { useRouter } from "next/router";
 import { useDialog } from "../../../../hooks/use-dialog";
 import { Grid } from "@mui/system";
+import DOMPurify from "dompurify";
+import { ClockIcon } from "@heroicons/react/24/outline";
 
 const Page = () => {
   const router = useRouter();
@@ -126,7 +139,7 @@ const Page = () => {
 
             allStandards.push({
               standardId,
-              standardName: standardInfo?.label || standardKey,
+              standardName: standardId || standardKey,
               currentTenantValue:
                 directStandardValue !== undefined
                   ? directStandardValue
@@ -176,24 +189,62 @@ const Page = () => {
             Back to Templates
           </Button>
         </Stack>
-        <Stack
-          direction="row"
-          justifyContent="flex-end"
-          alignItems="center"
-          spacing={4}
-          sx={{ mb: 3 }}
-        >
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<PlayArrow />}
-            onClick={runReportDialog.handleOpen}
-          >
-            Run Report Once
-          </Button>
-        </Stack>
-
-        {comparisonApi.isLoading && (
+        <Box>
+          <Stack direction="row" alignItems="space-between" spacing={2}>
+            <Typography variant="h4" width={"100%"}>
+              {
+                templateDetails?.data?.filter((template) => template.GUID === templateId)[0]
+                  .templateName
+              }
+            </Typography>
+            <Tooltip title="Refresh Data">
+              <IconButton onClick={() => comparisonApi.refetch()}>
+                <Sync />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+          <Stack alignItems="center" flexWrap="wrap" direction="row" spacing={2}>
+            {comparisonApi.data?.find((comparison) => comparison.RowKey === currentTenant) && (
+              <Stack alignItems="center" direction="row" spacing={1}>
+                <SvgIcon color="text.secondary" fontSize="small">
+                  <ClockIcon />
+                </SvgIcon>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Updated on{" "}
+                  {new Date(
+                    comparisonApi.data.find(
+                      (comparison) => comparison.RowKey === currentTenant
+                    ).LastRefresh
+                  ).toLocaleString()}
+                </Typography>
+              </Stack>
+            )}
+          </Stack>
+          {templateDetails?.data?.filter((template) => template.GUID === templateId)[0]
+            .description && (
+            <Box
+              sx={{
+                "& a": {
+                  color: (theme) => theme.palette.primary.main,
+                  textDecoration: "underline",
+                },
+                color: "text.secondary",
+                fontSize: "0.875rem",
+                "& p": {
+                  my: 0,
+                },
+                mt: 2,
+              }}
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(
+                  templateDetails?.data?.filter((template) => template.GUID === templateId)[0]
+                    .description
+                ),
+              }}
+            />
+          )}
+        </Box>
+        {comparisonApi.isFetching && (
           <>
             {[1, 2, 3].map((item) => (
               <Grid container spacing={3} key={item} sx={{ mb: 4 }}>
@@ -265,10 +316,6 @@ const Page = () => {
             ))}
           </>
         )}
-
-        <Typography variant="h6" sx={{ mb: 3, px: 1 }}>
-          Comparison Results
-        </Typography>
 
         {comparisonApi.isError && (
           <Card sx={{ mb: 4, p: 3, borderRadius: 2, boxShadow: 2 }}>

@@ -187,7 +187,13 @@ export const CippDataTable = (props) => {
     mrtTheme: (theme) => ({
       baseBackgroundColor: theme.palette.background.paper,
     }),
-
+    muiTablePaperProps: ({ table }) => ({
+      //not sx
+      style: {
+        zIndex: table.getState().isFullScreen ? 1000 : undefined,
+        top: table.getState().isFullScreen ? 64 : undefined,
+      },
+    }),
     columns: memoizedColumns,
     data: memoizedData,
     state: {
@@ -304,6 +310,22 @@ export const CippDataTable = (props) => {
           )}
         </>
       );
+    },
+    sortingFns: {
+      dateTimeNullsLast: (a, b, id) => {
+        const aVal = a?.original?.[id] ?? null;
+        const bVal = b?.original?.[id] ?? null;
+        if (aVal === null && bVal === null) {
+          return 0;
+        }
+        if (aVal === null) {
+          return 1;
+        }
+        if (bVal === null) {
+          return -1;
+        }
+        return aVal > bVal ? 1 : -1;
+      },
     },
     enableGlobalFilterModes: true,
   });
