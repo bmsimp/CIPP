@@ -12,3 +12,9 @@ rules:
   - base: docs
     upstream: KelvinTegelaar:docs
     mergeMethod: merge
+  - base: release/beta
+    upstream: KelvinTegelaar:release/beta
+    mergeMethod: merge
+      - base: release/nightly
+    upstream: KelvinTegelaar:release/nightly
+    mergeMethod: merge
