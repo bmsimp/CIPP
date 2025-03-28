@@ -25,6 +25,7 @@ import {
   FilterAlt,
   Close,
   Search,
+  FactCheck,
 } from "@mui/icons-material";
 import { ArrowLeftIcon } from "@mui/x-date-pickers";
 import standards from "/src/data/standards.json";
@@ -37,7 +38,7 @@ import { useRouter } from "next/router";
 import { useDialog } from "../../../../hooks/use-dialog";
 import { Grid } from "@mui/system";
 import DOMPurify from "dompurify";
-import { ClockIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { ClockIcon } from "@heroicons/react/24/outline";
 
 const Page = () => {
   const router = useRouter();
@@ -254,6 +255,13 @@ const Page = () => {
     return matchesFilter && matchesSearch;
   });
 
+  const allCount = comparisonData?.length || 0;
+  const compliantCount =
+    comparisonData?.filter((standard) => standard.complianceStatus === "Compliant").length || 0;
+  const nonCompliantCount =
+    comparisonData?.filter((standard) => standard.complianceStatus === "Non-Compliant").length || 0;
+  const compliancePercentage = allCount > 0 ? Math.round((compliantCount / allCount) * 100) : 0;
+
   return (
     <Box sx={{ flexGrow: 1, py: 4 }}>
       <Stack spacing={4} sx={{ px: 4 }}>
@@ -287,17 +295,37 @@ const Page = () => {
           <Stack alignItems="center" flexWrap="wrap" direction="row" spacing={2}>
             {comparisonApi.data?.find((comparison) => comparison.RowKey === currentTenant) && (
               <Stack alignItems="center" direction="row" spacing={1}>
-                <SvgIcon color="text.secondary" fontSize="small">
-                  <ClockIcon />
-                </SvgIcon>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Updated on{" "}
-                  {new Date(
+                <Chip
+                  icon={
+                    <SvgIcon fontSize="small">
+                      <FactCheck />
+                    </SvgIcon>
+                  }
+                  label={`${compliancePercentage}% Compliant`}
+                  variant="outlined"
+                  size="small"
+                  color={
+                    compliancePercentage === 100
+                      ? "success"
+                      : compliancePercentage >= 50
+                      ? "warning"
+                      : "error"
+                  }
+                  sx={{ ml: 2 }}
+                />
+                <Chip
+                  icon={
+                    <SvgIcon fontSize="small">
+                      <ClockIcon />
+                    </SvgIcon>
+                  }
+                  size="small"
+                  label={`Updated on ${new Date(
                     comparisonApi.data.find(
                       (comparison) => comparison.RowKey === currentTenant
                     ).LastRefresh
-                  ).toLocaleString()}
-                </Typography>
+                  ).toLocaleString()}`}
+                />
               </Stack>
             )}
           </Stack>
@@ -324,75 +352,6 @@ const Page = () => {
               }}
             />
           )}
-          <Divider sx={{ my: 2 }} />
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{
-              mt: 2,
-              alignItems: { xs: "flex-start", sm: "center" },
-              displayPrint: "none", // Hide filters in print view
-            }}
-          >
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ flexGrow: 1 }}>
-              <TextField
-                size="small"
-                variant="filled"
-                fullWidth={{ xs: true, sm: false }}
-                sx={{ width: { xs: "100%", sm: 350 } }}
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start" sx={{ margin: "0 !important" }}>
-                        <Search />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchQuery && (
-                      <InputAdornment position="end">
-                        <Tooltip title="Clear search">
-                          <IconButton
-                            size="small"
-                            onClick={() => setSearchQuery("")}
-                            aria-label="Clear search"
-                          >
-                            <Close />
-                          </IconButton>
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-            </Stack>
-            <ButtonGroup variant="outlined" color="primary" size="small">
-              <Button disabled={true} color="primary">
-                <SvgIcon fontSize="small">
-                  <FilterAlt />
-                </SvgIcon>
-              </Button>
-              <Button
-                variant={filter === "all" ? "contained" : "outlined"}
-                onClick={() => setFilter("all")}
-              >
-                All
-              </Button>
-              <Button
-                variant={filter === "compliant" ? "contained" : "outlined"}
-                onClick={() => setFilter("compliant")}
-              >
-                Compliant
-              </Button>
-              <Button
-                variant={filter === "nonCompliant" ? "contained" : "outlined"}
-                onClick={() => setFilter("nonCompliant")}
-              >
-                Non-Compliant
-              </Button>
-            </ButtonGroup>
-          </Stack>
         </Box>
         {comparisonApi.isFetching && (
           <>
@@ -471,6 +430,75 @@ const Page = () => {
           </>
         )}
 
+        <Divider sx={{ my: 2 }} />
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          sx={{
+            mt: 2,
+            alignItems: { xs: "flex-start", sm: "center" },
+            displayPrint: "none", // Hide filters in print view
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ flexGrow: 1 }}>
+            <TextField
+              size="small"
+              variant="filled"
+              fullWidth={{ xs: true, sm: false }}
+              sx={{ width: { xs: "100%", sm: 350 } }}
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start" sx={{ margin: "0 !important" }}>
+                      <Search />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery && (
+                    <InputAdornment position="end">
+                      <Tooltip title="Clear search">
+                        <IconButton
+                          size="small"
+                          onClick={() => setSearchQuery("")}
+                          aria-label="Clear search"
+                        >
+                          <Close />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          </Stack>
+          <ButtonGroup variant="outlined" color="primary" size="small">
+            <Button disabled={true} color="primary">
+              <SvgIcon fontSize="small">
+                <FilterAlt />
+              </SvgIcon>
+            </Button>
+            <Button
+              variant={filter === "all" ? "contained" : "outlined"}
+              onClick={() => setFilter("all")}
+            >
+              All ({allCount})
+            </Button>
+            <Button
+              variant={filter === "compliant" ? "contained" : "outlined"}
+              onClick={() => setFilter("compliant")}
+            >
+              Compliant ({compliantCount})
+            </Button>
+            <Button
+              variant={filter === "nonCompliant" ? "contained" : "outlined"}
+              onClick={() => setFilter("nonCompliant")}
+            >
+              Non-Compliant ({nonCompliantCount})
+            </Button>
+          </ButtonGroup>
+        </Stack>
         {comparisonApi.isError && (
           <Card sx={{ mb: 4, p: 3, borderRadius: 2, boxShadow: 2 }}>
             <Alert severity="error" sx={{ mb: 2 }}>
