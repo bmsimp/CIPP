@@ -15,6 +15,6 @@ rules:
   - base: release/beta
     upstream: KelvinTegelaar:release/beta
     mergeMethod: merge
-      - base: release/nightly
+  - base: release/nightly
     upstream: KelvinTegelaar:release/nightly
     mergeMethod: merge
