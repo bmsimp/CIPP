@@ -18,3 +18,6 @@ rules:
   - base: release/nightly
     upstream: KelvinTegelaar:release/nightly
     mergeMethod: merge
+  - base: feature-onboarding-improvement
+    upstream: KelvinTegelaar:feature-onboarding-improvement
+    mergeMethod: merge
