@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Button, Box, Grid } from "@mui/material";
+import { Button, Box } from "@mui/material";
+import { Grid } from "@mui/system";
 import CippFormComponent from "./CippFormComponent";
 import { ApiGetCall } from "../../api/ApiCall";
 import { useDialog } from "../../hooks/use-dialog";
@@ -73,7 +74,7 @@ export const CippNotificationForm = ({
     <>
       <Box sx={{ my: 2 }}>
         <Grid container spacing={2}>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <CippFormComponent
               disabled={listNotificationConfig.isFetching}
               type="textField"
@@ -83,7 +84,7 @@ export const CippNotificationForm = ({
               formControl={formControl}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <CippFormComponent
               disabled={listNotificationConfig.isFetching}
               type="textField"
@@ -92,7 +93,7 @@ export const CippNotificationForm = ({
               formControl={formControl}
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <CippFormComponent
               disabled={listNotificationConfig.isFetching}
               type="autoComplete"
@@ -103,7 +104,7 @@ export const CippNotificationForm = ({
               multiple
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <CippFormComponent
               disabled={listNotificationConfig.isFetching}
               type="autoComplete"
@@ -115,7 +116,7 @@ export const CippNotificationForm = ({
               multiple
             />
           </Grid>
-          <Grid item xs={12}>
+          <Grid item size={{ xs: 12 }}>
             <CippFormComponent
               type="switch"
               disabled={listNotificationConfig.isFetching}
@@ -132,7 +133,7 @@ export const CippNotificationForm = ({
             />
           </Grid>
           {showTestButton && (
-            <Grid item xs={12}>
+            <Grid item size={{ xs: 12 }}>
               <Button variant="outlined" onClick={notificationDialog.handleOpen}>
                 Send Test Alert
               </Button>

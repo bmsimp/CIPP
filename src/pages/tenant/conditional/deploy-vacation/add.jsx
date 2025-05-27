@@ -1,5 +1,6 @@
 import React from "react";
-import { Box, Divider, Grid, Typography } from "@mui/material";
+import { Box, Divider, Typography } from "@mui/material";
+import { Grid } from "@mui/system";
 import CippFormPage from "/src/components/CippFormPages/CippFormPage";
 import { Layout as DashboardLayout } from "/src/layouts/index.js";
 import { useForm } from "react-hook-form";
@@ -45,12 +46,12 @@ const Page = () => {
             exclusions for a specific period of time. Select the CA policy and the date range.
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12}>
+            <Grid item size={{ xs: 12 }}>
               <Divider sx={{ my: 2 }} />
             </Grid>
 
             {/* User Selector */}
-            <Grid item xs={12}>
+            <Grid item size={{ xs: 12 }}>
               <CippFormUserSelector
                 label={`Users in ${tenantDomain}`}
                 formControl={formControl}
@@ -62,7 +63,7 @@ const Page = () => {
             </Grid>
 
             {/* Conditional Access Policy Selector */}
-            <Grid item xs={12}>
+            <Grid item size={{ xs: 12 }}>
               <CippFormComponent
                 type="autoComplete"
                 label={`Conditional Access Policies in ${tenantDomain}`}
@@ -88,7 +89,7 @@ const Page = () => {
             </Grid>
 
             {/* Start Date Picker */}
-            <Grid item xs={12} md={6}>
+            <Grid item size={{ md: 6, xs: 12 }}>
               <CippFormComponent
                 type="datePicker"
                 label="Scheduled Start Date"
@@ -108,7 +109,7 @@ const Page = () => {
             </Grid>
 
             {/* End Date Picker */}
-            <Grid item xs={12} md={6}>
+            <Grid item size={{ md: 6, xs: 12 }}>
               <CippFormComponent
                 type="datePicker"
                 label="Scheduled End Date"

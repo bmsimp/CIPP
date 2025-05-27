@@ -1,14 +1,6 @@
 import { useRouter } from "next/router";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Grid,
-  useMediaQuery,
-} from "@mui/material";
-import { Stack } from "@mui/system";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, useMediaQuery } from "@mui/material";
+import { Stack, Grid } from "@mui/system";
 import { CippApiResults } from "./CippApiResults";
 import { ApiGetCall, ApiPostCall } from "../../api/ApiCall";
 import React, { useEffect, useState } from "react";
@@ -305,7 +297,7 @@ export const CippApiDialog = (props) => {
             <DialogContent>
               <Grid container spacing={2}>
                 {fields?.map((fieldProps, i) => (
-                  <Grid item xs={12} key={i}>
+                  <Grid item size={{ xs: 12 }} key={i}>
                     <CippFormComponent
                       formControl={formHook}
                       addedFieldData={addedFieldData}
