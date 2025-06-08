@@ -1067,7 +1067,7 @@
         "label": "Preferred Language",
         "api": {
           "url": "/languageList.json",
-          "labelField": "language",
+          "labelField": "tag",
           "valueField": "tag"
         }
       }
