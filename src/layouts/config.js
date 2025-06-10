@@ -1,12 +1,9 @@
 import { BuildingOfficeIcon, HomeIcon, UsersIcon, WrenchIcon } from "@heroicons/react/24/outline";
 import {
-  Cloud,
   CloudOutlined,
-  DeviceHub,
   HomeRepairService,
   Laptop,
   MailOutline,
-  Shield,
   ShieldOutlined,
 } from "@mui/icons-material";
 import { SvgIcon } from "@mui/material";
@@ -208,6 +205,14 @@ export const nativeMenuItems = [
             title: "Device Compliance",
             path: "/security/reports/list-device-compliance",
           },
+        ],
+      },
+      {
+        title: "Safe Links",
+        path: "/security/safelinks",
+        items: [
+          { title: "Safe Links Policies", path: "/security/safelinks/safelinks" },
+          { title: "Safe Links Templates", path: "/security/safelinks/safelinks-template" },
         ],
       },
     ],
