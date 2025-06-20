@@ -23,8 +23,6 @@ import { ApiGetCall } from "../api/ApiCall";
 const ExecutiveReportDocument = ({
   tenantName,
   userStats,
-  standardsData,
-  organizationData,
   brandingSettings,
   secureScoreData,
   licensingData,
@@ -184,6 +182,8 @@ const ExecutiveReportDocument = ({
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "flex-start",
+      pageBreakAfter: "avoid",
+      breakAfter: "avoid",
     },
 
     pageHeaderContent: {
@@ -206,6 +206,8 @@ const ExecutiveReportDocument = ({
     // SECTIONS - REPEATABLE PATTERNS (FROST)
     section: {
       marginBottom: 24,
+      pageBreakInside: "avoid",
+      breakInside: "avoid",
     },
 
     sectionTitle: {
@@ -213,6 +215,10 @@ const ExecutiveReportDocument = ({
       fontWeight: "bold",
       color: brandColor,
       marginBottom: 12,
+      pageBreakAfter: "avoid",
+      breakAfter: "avoid",
+      orphans: 3,
+      widows: 3,
     },
 
     bodyText: {
@@ -228,6 +234,8 @@ const ExecutiveReportDocument = ({
       flexDirection: "row",
       gap: 12,
       marginBottom: 20,
+      pageBreakInside: "avoid",
+      breakInside: "avoid",
     },
 
     statCard: {
@@ -305,6 +313,8 @@ const ExecutiveReportDocument = ({
       flexDirection: "row",
       gap: 12,
       marginBottom: 20,
+      pageBreakInside: "avoid",
+      breakInside: "avoid",
     },
 
     scoreCard: {
@@ -341,6 +351,8 @@ const ExecutiveReportDocument = ({
       padding: 16,
       marginBottom: 20,
       alignItems: "center",
+      pageBreakInside: "avoid",
+      breakInside: "avoid",
     },
 
     chartTitle: {
@@ -362,6 +374,8 @@ const ExecutiveReportDocument = ({
       border: `1px solid #E2E8F0`,
       borderRadius: 6,
       overflow: "hidden",
+      pageBreakInside: "avoid",
+      breakInside: "avoid",
     },
 
     tableHeader: {
@@ -454,6 +468,10 @@ const ExecutiveReportDocument = ({
       borderRadius: 4,
       padding: 12,
       marginBottom: 12,
+      pageBreakInside: "avoid",
+      breakInside: "avoid",
+      orphans: 3,
+      widows: 3,
     },
 
     infoTitle: {
@@ -472,6 +490,8 @@ const ExecutiveReportDocument = ({
     // RECOMMENDATIONS - SCALABLE SECTIONS (FROST)
     recommendationsList: {
       gap: 8,
+      pageBreakInside: "avoid",
+      breakInside: "avoid",
     },
 
     recommendationItem: {
@@ -651,19 +671,7 @@ const ExecutiveReportDocument = ({
       if (key.startsWith("standards.") && key !== "tenantFilter") {
         const standardKey = key;
         const standardValue = tenantData[key];
-
         const standardDef = standardsData?.find((std) => std.name === standardKey);
-        if (standardDef) {
-          console.log(`Standard details:`, {
-            name: standardDef.name,
-            label: standardDef.label,
-            helpText: standardDef.helpText?.substring(0, 50) + "...",
-          });
-        } else {
-          const partialMatch = standardsData?.find((s) =>
-            s.name.includes(standardKey.replace("standards.", ""))
-          );
-        }
 
         if (standardDef) {
           // Determine compliance status
@@ -673,7 +681,6 @@ const ExecutiveReportDocument = ({
           } else if (standardValue && standardValue.Value === true) {
             status = "Compliant";
           }
-
           // Get tags for display - fix the tags access
           const tags =
             standardDef.tag && Array.isArray(standardDef.tag) && standardDef.tag.length > 0
@@ -717,25 +724,6 @@ const ExecutiveReportDocument = ({
   };
 
   let securityControls = processStandardsData(standardsCompareData);
-
-  // Fallback for testing - if no real data, show some mock data
-  if (!securityControls || securityControls.length === 0) {
-    console.log("No standards data found, using fallback");
-    securityControls = [
-      {
-        name: "Multi-Factor Authentication",
-        description: "Enforce MFA for all administrative accounts",
-        status: "Compliant",
-        tags: "CIS, NIST",
-      },
-      {
-        name: "Password Policy",
-        description: "Strong password requirements with complexity",
-        status: "Review",
-        tags: "CIS",
-      },
-    ];
-  }
 
   const getBadgeStyle = (status) => {
     switch (status) {
@@ -869,7 +857,6 @@ const ExecutiveReportDocument = ({
 
       {/* SECURITY CONTROLS - Only show if standards data is available */}
       {(() => {
-        console.log("Checking security controls rendering:", securityControls?.length);
         return securityControls && securityControls.length > 0;
       })() && (
         <Page size="A4" style={styles.page}>
@@ -973,7 +960,7 @@ const ExecutiveReportDocument = ({
       )}
 
       {/* STATISTIC PAGE 2 - CHAPTER SPLITTER - Only show if secure score data is available */}
-      {secureScoreData?.isSuccess && secureScoreData?.translatedData && (
+      {secureScoreData && secureScoreData?.isSuccess && secureScoreData?.translatedData && (
         <Page size="A4" style={styles.statPage}>
           <Image style={styles.statBackground} src="/reportImages/glasses.jpg" />
           <View style={styles.statOverlay}>
@@ -992,7 +979,7 @@ const ExecutiveReportDocument = ({
       )}
 
       {/* MICROSOFT SECURE SCORE - DEDICATED PAGE - Only show if secure score data is available */}
-      {secureScoreData?.isSuccess && secureScoreData?.translatedData && (
+      {secureScoreData && secureScoreData?.isSuccess && secureScoreData?.translatedData && (
         <Page size="A4" style={styles.page}>
           <View style={styles.pageHeader}>
             <View style={styles.pageHeaderContent}>
@@ -1225,7 +1212,7 @@ const ExecutiveReportDocument = ({
       )}
 
       {/* LICENSING PAGE - Only show if license data is available */}
-      {licensingData && licensingData.length > 0 && (
+      {licensingData && Array.isArray(licensingData) && licensingData.length > 0 && (
         <>
           {/* STATISTIC PAGE 3 - CHAPTER SPLITTER */}
           <Page size="A4" style={styles.statPage}>
@@ -1356,7 +1343,7 @@ const ExecutiveReportDocument = ({
       )}
 
       {/* DEVICES PAGE - Only show if device data is available */}
-      {deviceData && deviceData.length > 0 && (
+      {deviceData && Array.isArray(deviceData) && deviceData.length > 0 && (
         <>
           {/* STATISTIC PAGE 4 - CHAPTER SPLITTER */}
           <Page size="A4" style={styles.statPage}>
@@ -1540,7 +1527,7 @@ const ExecutiveReportDocument = ({
       )}
 
       {/* CONDITIONAL ACCESS POLICIES PAGE - Only show if data is available */}
-      {conditionalAccessData && conditionalAccessData.length > 0 && (
+      {conditionalAccessData && Array.isArray(conditionalAccessData) && conditionalAccessData.length > 0 && (
         <>
           {/* STATISTIC PAGE 5 - CHAPTER SPLITTER */}
           <Page size="A4" style={styles.statPage}>
@@ -1815,20 +1802,23 @@ export const ExecutiveReportButton = (props) => {
     queryKey: `standards-compare-report-${settings.currentTenant}`,
   });
 
-  // Check if all data is loaded and successful
+  // Check if all data is loaded (either successful or failed)
   const isDataLoading =
     secureScore.isFetching ||
     licenseData.isFetching ||
     deviceData.isFetching ||
-    conditionalAccessData.isFetching;
-  const hasAllDataLoaded =
-    secureScore.isSuccess &&
-    licenseData.isSuccess &&
-    deviceData.isSuccess &&
-    conditionalAccessData.isSuccess;
+    conditionalAccessData.isFetching ||
+    standardsCompareData.isFetching;
+  
+  const hasAllDataFinished =
+    (secureScore.isSuccess || secureScore.isError) &&
+    (licenseData.isSuccess || licenseData.isError) &&
+    (deviceData.isSuccess || deviceData.isError) &&
+    (conditionalAccessData.isSuccess || conditionalAccessData.isError) &&
+    (standardsCompareData.isSuccess || standardsCompareData.isError);
 
-  // Only show button when all data is available
-  const shouldShowButton = hasAllDataLoaded && !isDataLoading;
+  // Show button when all data is finished loading (regardless of success/failure)
+  const shouldShowButton = hasAllDataFinished && !isDataLoading;
 
   const fileName = `Executive_Report_${tenantName?.replace(/[^a-zA-Z0-9]/g, "_") || "Tenant"}_${
     new Date().toISOString().split("T")[0]
@@ -1867,11 +1857,11 @@ export const ExecutiveReportButton = (props) => {
           standardsData={standardsData}
           organizationData={organizationData}
           brandingSettings={brandingSettings}
-          secureScoreData={secureScore}
-          licensingData={licenseData?.data}
-          deviceData={deviceData?.data}
-          conditionalAccessData={conditionalAccessData?.data}
-          standardsCompareData={standardsCompareData?.data}
+          secureScoreData={secureScore.isSuccess ? secureScore : null}
+          licensingData={licenseData.isSuccess ? licenseData?.data : null}
+          deviceData={deviceData.isSuccess ? deviceData?.data : null}
+          conditionalAccessData={conditionalAccessData.isSuccess ? conditionalAccessData?.data : null}
+          standardsCompareData={standardsCompareData.isSuccess ? standardsCompareData?.data : null}
         />
       }
       fileName={fileName}
