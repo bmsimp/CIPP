@@ -21,7 +21,14 @@ const Page = () => {
       apiUrl="/api/ListTenantAlignment"
       tenantInTitle={false}
       actions={actions}
-      simpleColumns={["tenantFilter", "standardName", "alignmentScore", "latestDataCollection"]}
+      simpleColumns={[
+        "tenantFilter",
+        "standardName",
+        "alignmentScore",
+        "LicenseMissingPercentage",
+        "combinedAlignmentScore",
+        "latestDataCollection",
+      ]}
       queryKey="listTenantAlignment"
     />
   );
