@@ -9,8 +9,7 @@ import {
   CardContent,
   CircularProgress,
   Alert,
-  Collapse,
-  Link
+  Link,
 } from "@mui/material";
 import {
   Timeline,
@@ -19,30 +18,30 @@ import {
   TimelineConnector,
   TimelineContent,
   TimelineDot,
-  TimelineOppositeContent
+  TimelineOppositeContent,
 } from "@mui/lab";
-import { Grid } from "@mui/system";
 import { Layout as DashboardLayout } from "/src/layouts/index.js";
 import { HeaderedTabbedLayout } from "/src/layouts/HeaderedTabbedLayout";
 import { ApiGetCall } from "/src/api/ApiCall";
 import { useRouter } from "next/router";
-import { 
-  Policy, 
-  Sync, 
-  PlayArrow, 
+import {
+  Policy,
+  Sync,
+  PlayArrow,
   Error as ErrorIcon,
   Warning as WarningIcon,
   Info as InfoIcon,
   CheckCircle as SuccessIcon,
-  ExpandMore
+  ExpandMore,
 } from "@mui/icons-material";
 import tabOptions from "./tabOptions.json";
+import { useSettings } from "../../../../hooks/use-settings";
 
 const Page = () => {
   const router = useRouter();
   const { templateId } = router.query;
-  const [daysToLoad, setDaysToLoad] = useState(7);
-  const [tenant] = useState("oglenet.onmicrosoft.com"); // You might want to get this from context or props
+  const [daysToLoad, setDaysToLoad] = useState(5);
+  const tenant = useSettings().currentTenant;
   const [expandedMessages, setExpandedMessages] = useState(new Set());
 
   // Toggle message expansion
@@ -64,7 +63,7 @@ const Page = () => {
     return {
       text: message.substring(0, maxLength) + "...",
       fullText: message,
-      isTruncated: true
+      isTruncated: true,
     };
   };
 
@@ -73,16 +72,15 @@ const Page = () => {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - days);
-    
+
     return {
-      startDate: startDate.toISOString().split('T')[0].replace(/-/g, ''),
-      endDate: endDate.toISOString().split('T')[0].replace(/-/g, '')
+      startDate: startDate.toISOString().split("T")[0].replace(/-/g, ""),
+      endDate: endDate.toISOString().split("T")[0].replace(/-/g, ""),
     };
   };
 
   const { startDate, endDate } = getDateRange(daysToLoad);
 
-  // API call to get logs
   const logsData = ApiGetCall({
     url: `/api/Listlogs?tenant=${tenant}&StartDate=${startDate}&EndDate=${endDate}&Filter=true`,
     queryKey: `Listlogs-${tenant}-${startDate}-${endDate}`,
@@ -92,16 +90,16 @@ const Page = () => {
   const getSeverityConfig = (severity) => {
     const severityLower = severity?.toLowerCase();
     switch (severityLower) {
-      case 'error':
-        return { icon: <ErrorIcon />, color: 'error', chipColor: 'error' };
-      case 'warning':
-        return { icon: <WarningIcon />, color: 'warning', chipColor: 'warning' };
-      case 'info':
-        return { icon: <InfoIcon />, color: 'info', chipColor: 'info' };
-      case 'success':
-        return { icon: <SuccessIcon />, color: 'success', chipColor: 'success' };
+      case "error":
+        return { icon: <ErrorIcon />, color: "error", chipColor: "error" };
+      case "warning":
+        return { icon: <WarningIcon />, color: "warning", chipColor: "warning" };
+      case "info":
+        return { icon: <InfoIcon />, color: "info", chipColor: "info" };
+      case "success":
+        return { icon: <SuccessIcon />, color: "success", chipColor: "success" };
       default:
-        return { icon: <InfoIcon />, color: 'grey', chipColor: 'default' };
+        return { icon: <InfoIcon />, color: "grey", chipColor: "default" };
     }
   };
 
@@ -109,22 +107,22 @@ const Page = () => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return {
-      time: date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
+      time: date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
       }),
-      date: date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: 'numeric'
-      })
+      date: date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
     };
   };
 
   // Load more days
   const handleLoadMore = () => {
-    setDaysToLoad(prev => prev + 7);
+    setDaysToLoad((prev) => prev + 7);
   };
 
   // Actions for the ActionsMenu
@@ -175,9 +173,9 @@ const Page = () => {
   ];
 
   // Sort logs by date (newest first)
-  const sortedLogs = logsData.data ? [...logsData.data].sort((a, b) => 
-    new Date(b.DateTime) - new Date(a.DateTime)
-  ) : [];
+  const sortedLogs = logsData.data
+    ? [...logsData.data].sort((a, b) => new Date(b.DateTime) - new Date(a.DateTime))
+    : [];
 
   return (
     <HeaderedTabbedLayout
@@ -193,7 +191,8 @@ const Page = () => {
         <Stack spacing={4}>
           <Typography variant="h6">Activity Timeline</Typography>
           <Typography variant="body1" color="text.secondary">
-            Historical timeline of system activities and events for the last {daysToLoad} days.
+            This timeline shows the history of actions taken on this tenant, by CIPP for the last{" "}
+            {daysToLoad} days.
           </Typography>
 
           {logsData.isLoading && (
@@ -203,15 +202,11 @@ const Page = () => {
           )}
 
           {logsData.isError && (
-            <Alert severity="error">
-              Failed to load activity logs. Please try again.
-            </Alert>
+            <Alert severity="error">Failed to load activity logs. Please try again.</Alert>
           )}
 
           {logsData.data && sortedLogs.length === 0 && (
-            <Alert severity="info">
-              No activity logs found for the selected time period.
-            </Alert>
+            <Alert severity="info">No activity logs found for the selected time period.</Alert>
           )}
 
           {logsData.data && sortedLogs.length > 0 && (
@@ -233,11 +228,11 @@ const Page = () => {
                     const { time, date } = formatDate(log.DateTime);
                     const { text, fullText, isTruncated } = truncateMessage(log.Message);
                     const isExpanded = expandedMessages.has(index);
-                    
+
                     return (
                       <TimelineItem key={index}>
                         <TimelineOppositeContent
-                          sx={{ m: 'auto 0', minWidth: 100, maxWidth: 100 }}
+                          sx={{ m: "auto 0", minWidth: 100, maxWidth: 100 }}
                           align="right"
                           variant="body2"
                           color="text.secondary"
@@ -245,19 +240,24 @@ const Page = () => {
                           <Typography variant="caption" display="block" fontSize="0.7rem">
                             {date}
                           </Typography>
-                          <Typography variant="caption" display="block" fontWeight="bold" fontSize="0.75rem">
+                          <Typography
+                            variant="caption"
+                            display="block"
+                            fontWeight="bold"
+                            fontSize="0.75rem"
+                          >
                             {time}
                           </Typography>
                         </TimelineOppositeContent>
-                        
+
                         <TimelineSeparator>
                           <TimelineDot color={color} variant="outlined" size="small">
                             {icon}
                           </TimelineDot>
                           {index < sortedLogs.length - 1 && <TimelineConnector />}
                         </TimelineSeparator>
-                        
-                        <TimelineContent sx={{ py: '8px', px: 2 }}>
+
+                        <TimelineContent sx={{ py: "8px", px: 2 }}>
                           <Stack spacing={1}>
                             <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
                               <Chip
@@ -265,26 +265,30 @@ const Page = () => {
                                 color={chipColor}
                                 size="small"
                                 variant="outlined"
-                                sx={{ fontSize: '0.7rem', height: 20 }}
+                                sx={{ fontSize: "0.7rem", height: 20 }}
                               />
                               <Chip
                                 label={log.API}
                                 size="small"
                                 variant="outlined"
-                                sx={{ fontSize: '0.7rem', height: 20 }}
+                                sx={{ fontSize: "0.7rem", height: 20 }}
                               />
                               {log.IP && (
                                 <Chip
                                   label={`IP: ${log.IP}`}
                                   size="small"
                                   variant="outlined"
-                                  sx={{ fontSize: '0.7rem', height: 20 }}
+                                  sx={{ fontSize: "0.7rem", height: 20 }}
                                 />
                               )}
                             </Box>
-                            
+
                             <Box>
-                              <Typography variant="body2" fontWeight="medium" sx={{ fontSize: '0.875rem' }}>
+                              <Typography
+                                variant="body2"
+                                fontWeight="medium"
+                                sx={{ fontSize: "0.875rem" }}
+                              >
                                 {isExpanded ? fullText : text}
                               </Typography>
                               {isTruncated && (
@@ -294,18 +298,22 @@ const Page = () => {
                                   onClick={() => toggleMessageExpansion(index)}
                                   sx={{
                                     mt: 0.5,
-                                    display: 'block',
-                                    textAlign: 'left',
-                                    fontSize: '0.75rem'
+                                    display: "block",
+                                    textAlign: "left",
+                                    fontSize: "0.75rem",
                                   }}
                                 >
-                                  {isExpanded ? 'Show less' : 'Show more'}
+                                  {isExpanded ? "Show less" : "Show more"}
                                 </Link>
                               )}
                             </Box>
-                            
+
                             {log.User && (
-                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: "0.7rem" }}
+                              >
                                 User: {log.User}
                               </Typography>
                             )}
@@ -315,7 +323,7 @@ const Page = () => {
                     );
                   })}
                 </Timeline>
-                
+
                 <Box display="flex" justifyContent="center" mt={3}>
                   <Button
                     variant="outlined"
