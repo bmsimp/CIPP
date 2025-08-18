@@ -67,7 +67,7 @@ const Page = () => {
   const userRequest = ApiGetCall({
     url: `/api/ListUserMailboxDetails?UserId=${userId}&tenantFilter=${userSettingsDefaults.currentTenant}&userMail=${graphUserRequest.data?.[0]?.userPrincipalName}`,
     queryKey: `Mailbox-${userId}`,
-    waiting: waiting,
+    waiting: waiting && !!graphUserRequest.data?.[0]?.userPrincipalName,
   });
 
   const usersList = ApiGetCall({
@@ -266,7 +266,7 @@ const Page = () => {
         new Date(oooRequest.data?.EndTime).getTime() / 1000 || null
       );
     }
-  }, [oooRequest.isSuccess]);
+  }, [oooRequest.isSuccess, oooRequest.data]);
 
   useEffect(() => {
     //if userId is defined, we can fetch the user data
