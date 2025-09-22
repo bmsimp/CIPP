@@ -18,7 +18,6 @@ import {
   History,
   EventRepeat,
   Schedule,
-  RestoreFromTrash,
   SettingsBackupRestore,
   Settings,
   CheckCircle,
@@ -62,7 +61,7 @@ const Page = () => {
       showHidden: true,
       Type: "New-CIPPBackup",
     },
-    queryKey: "BackupTasks",
+    queryKey: `BackupTasks-${settings.currentTenant}`,
   });
 
   // Use the actual backup files as the backup data
@@ -88,8 +87,10 @@ const Page = () => {
     tags: generateBackupTags(backup),
   }));
 
-  // Process existing backup configuration
-  const currentConfig = existingBackupConfig.data?.[0];
+  // Process existing backup configuration, find tenantFilter. by comparing settings.currentTenant with Tenant.value
+  const currentConfig = existingBackupConfig.data?.find(
+    (tenant) => tenant.Tenant.value === settings.currentTenant
+  );
   const hasExistingConfig = currentConfig && currentConfig.Parameters?.ScheduledBackupValues;
 
   // Create property items for current configuration
@@ -174,25 +175,19 @@ const Page = () => {
     },
   ];
 
-  const title = "Manage Drift";
-  const subtitle = [
-    {
-      text: `Template ID: ${templateId || "Loading..."}`,
-    },
-  ];
+  const title = "Manage Backups";
 
   return (
     <HeaderedTabbedLayout
       tabOptions={tabOptions}
       title={title}
-      subtitle={subtitle}
       backUrl="/tenant/standards/list-standards"
       actions={[]}
       actionsData={{}}
       isFetching={backupList.isFetching || existingBackupConfig.isFetching}
     >
       <CippHead title="Configuration Backup" />
-      <Box sx={{ py: 2 }}>
+      <Box sx={{ p: 1 }}>
         <Grid container spacing={3}>
           {/* Two Side-by-Side Displays */}
           <Grid size={{ md: 6, xs: 12 }}>
