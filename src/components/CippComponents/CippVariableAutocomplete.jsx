@@ -13,7 +13,7 @@ export const CippVariableAutocomplete = ({
   onSelect,
   searchQuery = "",
   tenantFilter = null,
-  includeSystemVariables = true,
+  includeSystemVariables = false,
   position = { top: 0, left: 0 }, // Cursor position for floating box
 }) => {
   const theme = useTheme();
@@ -47,7 +47,14 @@ export const CippVariableAutocomplete = ({
   };
 
   if (!open) {
-    console.log("Not rendering autocomplete - open is false");
+    return null;
+  }
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!variables || variables.length === 0) {
     return null;
   }
 
