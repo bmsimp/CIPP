@@ -8,40 +8,44 @@ import { ApiGetCall } from "/src/api/ApiCall";
  * @returns {object} { variables, isLoading, error }
  */
 export const useCustomVariables = (tenantFilter = null, includeSystemVariables = false) => {
-  // Simple, consistent query key using prefix pattern
-  // React Query can invalidate with wildcards like "CustomVariables*"
+  // Memoize normalized tenant filter and query parameters
+  const normalizedParams = useMemo(() => {
+    // Normalize tenantFilter
+    const normalizedTenantFilter = tenantFilter === "AllTenants" ? null : tenantFilter;
 
-  if (tenantFilter === "AllTenants") {
-    tenantFilter = null; // Normalize to null for global context
-  }
-  const queryKey = `CustomVariables-${tenantFilter || "global"}-${
-    includeSystemVariables ? "withSystem" : "noSystem"
-  }`;
+    // Generate query key
+    const queryKey = `CustomVariables-${normalizedTenantFilter || "global"}-${
+      includeSystemVariables ? "withSystem" : "noSystem"
+    }`;
 
-  // Simple related keys pattern - React Query supports predicate-based invalidation
-  const relatedQueryKeys = ["CustomVariables*"];
+    // Build API URL
+    let apiUrl = "/api/ListCustomVariables";
+    const params = new URLSearchParams();
 
-  // Build API URL with optional tenant filter and system variables setting
-  let apiUrl = "/api/ListCustomVariables";
-  const params = new URLSearchParams();
+    if (normalizedTenantFilter) {
+      params.append("tenantFilter", normalizedTenantFilter);
+    }
 
-  if (tenantFilter) {
-    params.append("tenantFilter", tenantFilter);
-  }
+    if (!includeSystemVariables) {
+      params.append("includeSystem", "false");
+    }
 
-  if (!includeSystemVariables) {
-    params.append("includeSystem", "false");
-  }
+    if (params.toString()) {
+      apiUrl += `?${params.toString()}`;
+    }
 
-  if (params.toString()) {
-    apiUrl += `?${params.toString()}`;
-  }
+    return {
+      queryKey,
+      apiUrl,
+      relatedQueryKeys: ["CustomVariables*"],
+    };
+  }, [tenantFilter, includeSystemVariables]);
 
   // Fetch variables from API
   const apiCall = ApiGetCall({
-    url: apiUrl,
-    queryKey,
-    relatedQueryKeys,
+    url: normalizedParams.apiUrl,
+    queryKey: normalizedParams.queryKey,
+    relatedQueryKeys: normalizedParams.relatedQueryKeys,
     refetchOnMount: false,
     refetchOnReconnect: false,
     staleTime: 5 * 60 * 1000, // 5 minutes - variables don't change often
@@ -128,6 +132,6 @@ export const useCustomVariables = (tenantFilter = null, includeSystemVariables =
     isError: apiCall.isError,
     error: apiCall.error,
     metadata: apiCall.data?.Metadata,
-    relatedQueryKeys, // Expose related query keys for other components
+    relatedQueryKeys: normalizedParams.relatedQueryKeys, // Expose related query keys for other components
   };
 };
