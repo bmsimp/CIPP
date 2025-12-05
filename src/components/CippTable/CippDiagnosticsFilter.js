@@ -51,6 +51,7 @@ const CippDiagnosticsFilter = ({ onSubmitFilter }) => {
       label: preset.name,
       value: preset.id,
       query: preset.query,
+      columns: preset.columns || null,
       isBuiltin: true,
     }));
 
@@ -78,12 +79,21 @@ const CippDiagnosticsFilter = ({ onSubmitFilter }) => {
         formControl.setValue("query", preset.query);
         formControl.setValue("presetName", preset.label);
         setSelectedPreset(preset);
+        // Clear the preset selection so user can edit freely
+        formControl.setValue("queryPreset", null);
       }
-    } else {
-      // Clear selection when preset is cleared
-      setSelectedPreset(null);
     }
   }, [queryPreset, formControl]);
+
+  // Clear selectedPreset when query is manually edited (unless preset is custom or has no columns)
+  useEffect(() => {
+    if (selectedPreset && queryValue !== selectedPreset.query) {
+      // Only clear if preset is built-in and has columns defined
+      if (selectedPreset.isBuiltin && selectedPreset.columns) {
+        setSelectedPreset(null);
+      }
+    }
+  }, [queryValue, selectedPreset]);
 
   const savePresetApi = ApiPostCall({
     relatedQueryKeys: ["ListDiagnosticsPresets"],
@@ -98,22 +108,21 @@ const CippDiagnosticsFilter = ({ onSubmitFilter }) => {
       return;
     }
 
-    // Don't allow updating built-in presets
-    if (selectedPreset?.isBuiltin) {
-      return;
-    }
-
+    // Built-in presets get saved as new custom presets (no GUID = new preset)
+    // Custom presets can be updated (include GUID)
     const presetData = {
       name: presetName,
       query: queryValue,
-      GUID: selectedPreset?.value || undefined,
+      GUID: selectedPreset?.isBuiltin ? undefined : selectedPreset?.value || undefined,
     };
+
+    const isUpdate = selectedPreset && !selectedPreset.isBuiltin;
 
     savePresetApi.mutate({
       url: "/api/ExecDiagnosticsPresets",
       data: presetData,
-      title: selectedPreset ? "Update Preset" : "Save Preset",
-      message: selectedPreset
+      title: isUpdate ? "Update Preset" : "Save Preset",
+      message: isUpdate
         ? `Preset "${presetName}" updated successfully`
         : `Preset "${presetName}" saved successfully`,
     });
@@ -141,15 +150,24 @@ const CippDiagnosticsFilter = ({ onSubmitFilter }) => {
 
   const onSubmit = (values) => {
     if (values.query && values.query.trim()) {
-      onSubmitFilter(values);
+      onSubmitFilter({
+        ...values,
+        presetDisplayName: values.presetName || selectedPreset?.label || null,
+        columns: selectedPreset?.columns || null,
+      });
       setExpanded(false);
     }
   };
 
   const handleClear = () => {
     formControl.reset({ query: "", presetName: "", queryPreset: null });
-    onSubmitFilter({ query: "" });
-    setSelectedPreset(null);
+    onSubmitFilter({ query: "", presetDisplayName: null, columns: null });
+    // Only clear selectedPreset if it's a built-in preset
+    // Keep custom preset reference so user can continue editing and saving
+    if (selectedPreset?.isBuiltin) {
+      setSelectedPreset(null);
+    }
+    setExpanded(true);
   };
 
   return (
@@ -199,7 +217,7 @@ const CippDiagnosticsFilter = ({ onSubmitFilter }) => {
                         <Tooltip
                           title={
                             selectedPreset?.isBuiltin
-                              ? "Built-in presets cannot be modified"
+                              ? "Save as New Custom Preset"
                               : selectedPreset
                               ? "Update Preset"
                               : "Save Preset"
@@ -209,12 +227,7 @@ const CippDiagnosticsFilter = ({ onSubmitFilter }) => {
                             <IconButton
                               color="primary"
                               onClick={handleSavePreset}
-                              disabled={
-                                !presetName ||
-                                !queryValue ||
-                                savePresetApi.isPending ||
-                                selectedPreset?.isBuiltin
-                              }
+                              disabled={!presetName || !queryValue || savePresetApi.isPending}
                             >
                               {savePresetApi.isPending ? <CircularProgress size={24} /> : <Save />}
                             </IconButton>
