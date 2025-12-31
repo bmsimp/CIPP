@@ -8,12 +8,13 @@ import {
   Avatar,
   Divider,
   Tooltip,
-  Autocomplete,
-  TextField,
   Button,
   Skeleton,
+  Stack,
 } from "@mui/material";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { useForm, useWatch } from "react-hook-form";
 import { Grid } from "@mui/system";
 import { useSettings } from "/src/hooks/use-settings";
 import { ApiGetCall } from "/src/api/ApiCall.jsx";
@@ -45,10 +46,14 @@ import { CaSankey } from "/src/components/CippComponents/CaSankey";
 import { CaDeviceSankey } from "/src/components/CippComponents/CaDeviceSankey";
 import { AuthMethodSankey } from "/src/components/CippComponents/AuthMethodSankey";
 import { DesktopDevicesSankey } from "/src/components/CippComponents/DesktopDevicesSankey";
+import { LicenseSankey } from "/src/components/CippComponents/LicenseSankey";
 import { MobileSankey } from "/src/components/CippComponents/MobileSankey";
 import { CippUniversalSearch } from "/src/components/CippCards/CippUniversalSearch.jsx";
+import { CippApiDialog } from "/src/components/CippComponents/CippApiDialog";
+import { CippAddTestReportDrawer } from "/src/components/CippComponents/CippAddTestReportDrawer";
 import { CippCopyToClipBoard } from "/src/components/CippComponents/CippCopyToClipboard.jsx";
 import { CippTimeAgo } from "/src/components/CippComponents/CippTimeAgo.jsx";
+import CippFormComponent from "/src/components/CippComponents/CippFormComponent";
 import {
   People as UsersIcon,
   Person as UserIcon,
@@ -62,6 +67,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Laptop as MonitorIcon,
   Work as BriefcaseIcon,
+  CardMembership as CardMembershipIcon,
 } from "@mui/icons-material";
 
 // Helper function to process MFAState data into Sankey chart format
@@ -271,17 +277,45 @@ const processAuthMethodsData = (mfaState) => {
 
 const Page = () => {
   const settings = useSettings();
+  const router = useRouter();
   const { currentTenant } = settings;
   const [portalMenuItems, setPortalMenuItems] = useState([]);
-  const [selectedReport, setSelectedReport] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false });
 
-  const reportOptions = [
-    "Select a report",
-    "Executive Summary Report",
-    "Security Assessment Report",
-    "Compliance Report",
-    "Device Inventory Report",
-  ];
+  // Get reportId from query params or default to "ztna"
+  const selectedReport = router.query.reportId || "ztna";
+
+  const formControl = useForm({
+    mode: "onChange",
+    defaultValues: {
+      reportId: selectedReport,
+    },
+  });
+
+  const reportIdValue = useWatch({ control: formControl.control });
+
+  // Update URL when form value changes (e.g., user selects different report from dropdown)
+  useEffect(() => {
+    console.log("reportIdValue changed:", reportIdValue);
+    if (reportIdValue && reportIdValue.reportId?.value !== selectedReport) {
+      router.push(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, reportId: reportIdValue.reportId?.value },
+        },
+        undefined,
+        { shallow: true }
+      );
+    }
+  }, [reportIdValue]);
+
+  // Fetch available reports
+  const reportsApi = ApiGetCall({
+    url: "/api/ListTestReports",
+    queryKey: "ListTestReports",
+  });
+
+  const reports = reportsApi.data || [];
 
   const organization = ApiGetCall({
     url: "/api/ListOrg",
@@ -291,8 +325,9 @@ const Page = () => {
 
   const testsApi = ApiGetCall({
     url: "/api/ListTests",
-    data: { tenantFilter: currentTenant, reportId: "d5d1e123-bce0-482d-971f-be6ed820dd92" },
-    queryKey: `${currentTenant}-ListTests-d5d1e123-bce0-482d-971f-be6ed820dd92`,
+    data: { tenantFilter: currentTenant, reportId: selectedReport },
+    queryKey: `${currentTenant}-ListTests-${selectedReport}`,
+    waiting: !!currentTenant && !!selectedReport,
   });
 
   const driftApi = ApiGetCall({
@@ -423,29 +458,37 @@ const Page = () => {
           <Grid size={{ xs: 12, md: 6 }}>
             <Card sx={{ height: "100%" }}>
               <CardContent sx={{ display: "flex", gap: 1.5, alignItems: "center", p: 2 }}>
-                <Autocomplete
-                  size="small"
-                  options={reportOptions}
-                  value={selectedReport}
-                  onChange={(event, newValue) => setSelectedReport(newValue)}
-                  sx={{ flex: 1 }}
-                  renderInput={(params) => (
-                    <TextField {...params} label="Select a report" placeholder="Choose a report" />
-                  )}
-                />
-                <Button
-                  variant="contained"
-                  size="small"
-                  sx={{ whiteSpace: "nowrap", minHeight: 40 }}
-                >
-                  Create custom report
-                </Button>
+                <Box sx={{ flex: 1 }}>
+                  <CippFormComponent
+                    name="reportId"
+                    label="Select a report"
+                    type="autoComplete"
+                    multiple={false}
+                    formControl={formControl}
+                    options={reports.map((r) => ({
+                      label: r.description ? `${r.name} - ${r.description}` : r.name,
+                      value: r.id,
+                      description: r.description,
+                    }))}
+                    placeholder="Choose a report"
+                  />
+                </Box>
+                <CippAddTestReportDrawer />
                 <Button
                   variant="outlined"
                   color="error"
                   size="small"
                   sx={{ minHeight: 40 }}
-                  disabled={!selectedReport || selectedReport === "Select a report"}
+                  onClick={() => {
+                    const report = reports.find((r) => r.id === selectedReport);
+                    if (report && report.source !== "file") {
+                      setDeleteDialog({
+                        open: true,
+                        handleClose: () => setDeleteDialog({ open: false }),
+                        row: { ReportId: selectedReport, name: report.name },
+                      });
+                    }
+                  }}
                 >
                   Delete
                 </Button>
@@ -1124,13 +1167,13 @@ const Page = () => {
                   </CardContent>
                 </Card>
 
-                {/* Device Sign-ins */}
+                {/* License Overview */}
                 <Card sx={{ flex: 1 }}>
                   <CardHeader
                     title={
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <DevicesIcon sx={{ fontSize: 24 }} />
-                        <Typography variant="h6">Device sign-ins</Typography>
+                        <CardMembershipIcon sx={{ fontSize: 24 }} />
+                        <Typography variant="h6">License Overview</Typography>
                       </Box>
                     }
                     sx={{ pb: 1 }}
@@ -1139,10 +1182,8 @@ const Page = () => {
                     <Box sx={{ height: 300 }}>
                       {testsApi.isFetching ? (
                         <Skeleton variant="rectangular" width="100%" height={300} />
-                      ) : reportData.TenantInfo.OverviewCaDevicesAllUsers?.nodes ? (
-                        <CaDeviceSankey
-                          data={reportData.TenantInfo.OverviewCaDevicesAllUsers.nodes}
-                        />
+                      ) : testsApi.data?.LicenseData && Array.isArray(testsApi.data.LicenseData) ? (
+                        <LicenseSankey data={testsApi.data.LicenseData} />
                       ) : (
                         <Box
                           sx={{
@@ -1153,15 +1194,83 @@ const Page = () => {
                           }}
                         >
                           <Typography variant="body2" color="text.secondary">
-                            No device sign-in data available
+                            No license data available
                           </Typography>
                         </Box>
                       )}
                     </Box>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                      {reportData.TenantInfo.OverviewCaDevicesAllUsers?.description ||
-                        "No description available"}
-                    </Typography>
+                  </CardContent>
+                  <Divider />
+                  <CardContent sx={{ pt: 2 }}>
+                    {testsApi.isFetching ? (
+                      <Box sx={{ display: "flex", gap: 2 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Skeleton width={80} height={20} sx={{ mb: 1 }} />
+                          <Skeleton width={60} height={32} />
+                        </Box>
+                        <Divider orientation="vertical" flexItem />
+                        <Box sx={{ flex: 1 }}>
+                          <Skeleton width={80} height={20} sx={{ mb: 1 }} />
+                          <Skeleton width={60} height={32} />
+                        </Box>
+                        <Divider orientation="vertical" flexItem />
+                        <Box sx={{ flex: 1 }}>
+                          <Skeleton width={80} height={20} sx={{ mb: 1 }} />
+                          <Skeleton width={60} height={32} />
+                        </Box>
+                      </Box>
+                    ) : testsApi.data?.LicenseData && Array.isArray(testsApi.data.LicenseData) ? (
+                      <Box sx={{ display: "flex", gap: 2 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Total Licenses
+                          </Typography>
+                          <Typography variant="h6" fontWeight="bold">
+                            {testsApi.data.LicenseData.reduce(
+                              (sum, lic) => sum + (parseInt(lic?.TotalLicenses || 0) || 0),
+                              0
+                            ).toLocaleString()}
+                          </Typography>
+                        </Box>
+                        <Divider orientation="vertical" flexItem />
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Assigned
+                          </Typography>
+                          <Typography variant="h6" fontWeight="bold">
+                            {testsApi.data.LicenseData.reduce(
+                              (sum, lic) => sum + (parseInt(lic?.CountUsed || 0) || 0),
+                              0
+                            ).toLocaleString()}
+                          </Typography>
+                        </Box>
+                        <Divider orientation="vertical" flexItem />
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Available
+                          </Typography>
+                          <Typography variant="h6" fontWeight="bold">
+                            {testsApi.data.LicenseData.reduce(
+                              (sum, lic) => sum + (parseInt(lic?.CountAvailable || 0) || 0),
+                              0
+                            ).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          py: 2,
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          No license statistics available
+                        </Typography>
+                      </Box>
+                    )}
                   </CardContent>
                 </Card>
               </Box>
@@ -1536,7 +1645,7 @@ const Page = () => {
                   title={
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <MonitorIcon sx={{ fontSize: 24 }} />
-                      <Typography variant="h6">Desktop devices</Typography>
+                      <Typography variant="h6">License Overview</Typography>
                     </Box>
                   }
                   sx={{ pb: 1 }}
@@ -1545,10 +1654,8 @@ const Page = () => {
                   <Box sx={{ height: 350 }}>
                     {testsApi.isFetching ? (
                       <Skeleton variant="rectangular" width="100%" height={350} />
-                    ) : reportData.TenantInfo.DeviceOverview?.DesktopDevicesSummary?.nodes ? (
-                      <DesktopDevicesSankey
-                        data={reportData.TenantInfo.DeviceOverview.DesktopDevicesSummary.nodes}
-                      />
+                    ) : testsApi.data?.LicenseData ? (
+                      <LicenseSankey data={testsApi.data.LicenseData} />
                     ) : (
                       <Box
                         sx={{
@@ -1559,14 +1666,13 @@ const Page = () => {
                         }}
                       >
                         <Typography variant="body2" color="text.secondary">
-                          No desktop device data available
+                          No license data available
                         </Typography>
                       </Box>
                     )}
                   </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    {reportData.TenantInfo.DeviceOverview.DesktopDevicesSummary?.description ||
-                      "No description available"}
+                    Overview of license assignments and availability
                   </Typography>
                 </CardContent>
                 <Divider />
@@ -1574,96 +1680,70 @@ const Page = () => {
                   {testsApi.isFetching ? (
                     <Box sx={{ display: "flex", gap: 2 }}>
                       <Box sx={{ flex: 1 }}>
-                        <Skeleton width={60} height={50} />
+                        <Skeleton width={80} height={20} sx={{ mb: 1 }} />
+                        <Skeleton width={60} height={32} />
                       </Box>
                       <Divider orientation="vertical" flexItem />
                       <Box sx={{ flex: 1 }}>
-                        <Skeleton width={60} height={50} />
+                        <Skeleton width={80} height={20} sx={{ mb: 1 }} />
+                        <Skeleton width={60} height={32} />
                       </Box>
                       <Divider orientation="vertical" flexItem />
                       <Box sx={{ flex: 1 }}>
-                        <Skeleton width={60} height={50} />
+                        <Skeleton width={80} height={20} sx={{ mb: 1 }} />
+                        <Skeleton width={60} height={32} />
                       </Box>
                     </Box>
-                  ) : (
+                  ) : testsApi.data?.LicenseData && Array.isArray(testsApi.data.LicenseData) ? (
                     <Box sx={{ display: "flex", gap: 2 }}>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Entra joined
+                          Total Licenses
                         </Typography>
                         <Typography variant="h6" fontWeight="bold">
-                          {(() => {
-                            const nodes =
-                              reportData.TenantInfo.DeviceOverview?.DesktopDevicesSummary?.nodes ||
-                              [];
-                            const entraJoined =
-                              nodes.find((n) => n.target === "Entra joined")?.value || 0;
-                            const windowsDevices =
-                              nodes.find(
-                                (n) => n.source === "Desktop devices" && n.target === "Windows"
-                              )?.value || 0;
-                            const macOSDevices =
-                              nodes.find(
-                                (n) => n.source === "Desktop devices" && n.target === "macOS"
-                              )?.value || 0;
-                            const total = windowsDevices + macOSDevices;
-                            return Math.round((entraJoined / (total || 1)) * 100);
-                          })()}
-                          %
+                          {testsApi.data.LicenseData.reduce(
+                            (sum, lic) => sum + (parseInt(lic?.TotalLicenses || 0) || 0),
+                            0
+                          ).toLocaleString()}
                         </Typography>
                       </Box>
                       <Divider orientation="vertical" flexItem />
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Entra hybrid joined
+                          Assigned
                         </Typography>
                         <Typography variant="h6" fontWeight="bold">
-                          {(() => {
-                            const nodes =
-                              reportData.TenantInfo.DeviceOverview?.DesktopDevicesSummary?.nodes ||
-                              [];
-                            const entraHybrid =
-                              nodes.find((n) => n.target === "Entra hybrid joined")?.value || 0;
-                            const windowsDevices =
-                              nodes.find(
-                                (n) => n.source === "Desktop devices" && n.target === "Windows"
-                              )?.value || 0;
-                            const macOSDevices =
-                              nodes.find(
-                                (n) => n.source === "Desktop devices" && n.target === "macOS"
-                              )?.value || 0;
-                            const total = windowsDevices + macOSDevices;
-                            return Math.round((entraHybrid / (total || 1)) * 100);
-                          })()}
-                          %
+                          {testsApi.data.LicenseData.reduce(
+                            (sum, lic) => sum + (parseInt(lic?.CountUsed || 0) || 0),
+                            0
+                          ).toLocaleString()}
                         </Typography>
                       </Box>
                       <Divider orientation="vertical" flexItem />
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Entra registered
+                          Available
                         </Typography>
                         <Typography variant="h6" fontWeight="bold">
-                          {(() => {
-                            const nodes =
-                              reportData.TenantInfo.DeviceOverview?.DesktopDevicesSummary?.nodes ||
-                              [];
-                            const entraRegistered =
-                              nodes.find((n) => n.target === "Entra registered")?.value || 0;
-                            const windowsDevices =
-                              nodes.find(
-                                (n) => n.source === "Desktop devices" && n.target === "Windows"
-                              )?.value || 0;
-                            const macOSDevices =
-                              nodes.find(
-                                (n) => n.source === "Desktop devices" && n.target === "macOS"
-                              )?.value || 0;
-                            const total = windowsDevices + macOSDevices;
-                            return Math.round((entraRegistered / (total || 1)) * 100);
-                          })()}
-                          %
+                          {testsApi.data.LicenseData.reduce(
+                            (sum, lic) => sum + (parseInt(lic?.CountAvailable || 0) || 0),
+                            0
+                          ).toLocaleString()}
                         </Typography>
                       </Box>
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        py: 2,
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        No license statistics available
+                      </Typography>
                     </Box>
                   )}
                 </CardContent>
@@ -1800,6 +1880,23 @@ const Page = () => {
           </Grid>
         </Box>
       </Box>
+
+      {/* Delete Report Dialog */}
+      <CippApiDialog
+        createDialog={deleteDialog}
+        title="Delete Custom Report"
+        fields={[]}
+        row={reportIdValue}
+        api={{
+          url: "/api/DeleteTestReport",
+          type: "POST",
+          data: {
+            ReportId: reportIdValue.reportId?.value,
+          },
+          confirmText: "Are you sure you want to delete this report? This action cannot be undone.",
+          relatedQueryKeys: ["ListTestReports"],
+        }}
+      />
     </Container>
   );
 };
