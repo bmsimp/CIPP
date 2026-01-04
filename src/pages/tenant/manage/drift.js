@@ -24,10 +24,6 @@ import {
   Chip,
   SvgIcon,
   TextField,
-  InputAdornment,
-  Card,
-  CardContent,
-  CardHeader,
   Divider,
 } from "@mui/material";
 import { Grid } from "@mui/system";
@@ -135,6 +131,61 @@ const ManageDriftPage = () => {
         acc.deniedDeviationsList.push(...item.deniedDeviations.filter((dev) => dev !== null));
       }
 
+      // Extract compliant standards from ComparisonDetails in driftSettings
+      if (
+        item.driftSettings?.ComparisonDetails &&
+        Array.isArray(item.driftSettings.ComparisonDetails)
+      ) {
+        const compliantStandards = item.driftSettings.ComparisonDetails.filter(
+          (detail) => detail.Compliant === true
+        ).map((detail) => {
+          // Strip "standards." prefix if present
+          let standardName = detail.StandardName;
+          if (standardName.startsWith("standards.")) {
+            standardName = standardName.substring("standards.".length);
+          }
+
+          let displayName = null;
+
+          // For template types, extract the display name from standardSettings
+          if (standardName.startsWith("IntuneTemplate.")) {
+            const guid = standardName.substring("IntuneTemplate.".length);
+            const intuneTemplates = item.driftSettings?.standardSettings?.IntuneTemplate;
+            if (Array.isArray(intuneTemplates)) {
+              const template = intuneTemplates.find((t) => t.TemplateList?.value === guid);
+              if (template?.TemplateList?.label) {
+                displayName = template.TemplateList.label;
+              }
+            }
+          } else if (standardName.startsWith("ConditionalAccessTemplate.")) {
+            const guid = standardName.substring("ConditionalAccessTemplate.".length);
+            const caTemplates = item.driftSettings?.standardSettings?.ConditionalAccessTemplate;
+            if (Array.isArray(caTemplates)) {
+              const template = caTemplates.find((t) => t.TemplateList?.value === guid);
+              if (template?.TemplateList?.label) {
+                displayName = template.TemplateList.label;
+              }
+            }
+          } else {
+            // For non-template standards, keep the "standards." prefix for lookup
+            standardName = detail.StandardName;
+          }
+
+          return {
+            standardName: standardName,
+            standardDisplayName: displayName, // Set display name if found from templates
+            state: "aligned",
+            Status: "Aligned",
+            ComplianceStatus: detail.ComplianceStatus,
+            StandardValue: detail.StandardValue,
+            ReportingDisabled: detail.ReportingDisabled,
+            expectedValue: "Compliant with template",
+            receivedValue: detail.StandardValue,
+          };
+        });
+        acc.alignedStandards.push(...compliantStandards);
+      }
+
       // Use the latest data collection timestamp
       if (
         item.latestDataCollection &&
@@ -156,22 +207,10 @@ const ManageDriftPage = () => {
       acceptedDeviations: [],
       customerSpecificDeviationsList: [],
       deniedDeviationsList: [],
+      alignedStandards: [],
       latestDataCollection: null,
     }
   );
-
-  const chartLabels = [
-    "Aligned Policies",
-    "Accepted Deviations",
-    "Current Deviations",
-    "Customer Specific Deviations",
-  ];
-  const chartSeries = [
-    processedDriftData.alignedCount || 0,
-    processedDriftData.acceptedDeviationsCount || 0,
-    processedDriftData.currentDeviationsCount || 0,
-    processedDriftData.customerSpecificDeviations || 0,
-  ];
 
   // Transform currentDeviations into deviation items for display
   const getDeviationIcon = (state) => {
@@ -190,6 +229,9 @@ const ManageDriftPage = () => {
         return <CheckCircle color="success" />;
       case "customerspecific":
         return <Info color="info" />;
+      case "aligned":
+      case "compliant":
+        return <CheckCircle color="success" />;
       default:
         return <Warning color="warning" />;
     }
@@ -211,6 +253,9 @@ const ManageDriftPage = () => {
         return "success.main";
       case "customerspecific":
         return "info.main";
+      case "aligned":
+      case "compliant":
+        return "success.main";
       default:
         return "warning.main";
     }
@@ -232,6 +277,9 @@ const ManageDriftPage = () => {
         return "Accepted Deviation";
       case "customerspecific":
         return "Customer Specific";
+      case "aligned":
+      case "compliant":
+        return "Compliant";
       default:
         return "Deviation";
     }
@@ -362,6 +410,7 @@ const ManageDriftPage = () => {
     processedDriftData.deniedDeviationsList,
     "denied"
   );
+  const alignedStandardItems = createDeviationItems(processedDriftData.alignedStandards, "aligned");
 
   const handleMenuClick = (event, itemId) => {
     setAnchorEl((prev) => ({ ...prev, [itemId]: event.currentTarget }));
@@ -474,10 +523,7 @@ const ManageDriftPage = () => {
   };
 
   const handleBulkAction = (action) => {
-    if (
-      !processedDriftData.currentDeviations ||
-      processedDriftData.currentDeviations.length === 0
-    ) {
+    if (!selectedItems || selectedItems.length === 0) {
       setBulkActionsAnchorEl(null);
       return;
     }
@@ -487,30 +533,51 @@ const ManageDriftPage = () => {
     switch (action) {
       case "accept-all-customer-specific":
         status = "CustomerSpecific";
-        actionText = "accept all deviations as customer specific";
+        actionText = "accept selected deviations as customer specific";
         break;
       case "accept-all":
         status = "Accepted";
-        actionText = "accept all deviations";
+        actionText = "accept selected deviations";
         break;
       case "deny-all":
         status = "Denied";
-        actionText = "deny all deviations";
+        actionText = "deny selected deviations";
         break;
       case "deny-all-delete":
         status = "DeniedDelete";
-        actionText = "deny all deviations and delete";
+        actionText = "deny selected deviations and delete";
         break;
       case "deny-all-remediate":
         status = "DeniedRemediate";
-        actionText = "deny all deviations and remediate to align with template";
+        actionText = "deny selected deviations and remediate to align with template";
         break;
       default:
         setBulkActionsAnchorEl(null);
         return;
     }
 
-    const deviations = processedDriftData.currentDeviations.map((deviation) => ({
+    // Map selected item IDs back to their deviation data
+    // IDs are in format: "current-1", "accepted-2", etc.
+    const allDeviations = [
+      ...deviationItemsWithActions,
+      ...acceptedDeviationItemsWithActions,
+      ...customerSpecificDeviationItemsWithActions,
+      ...deniedDeviationItemsWithActions,
+    ];
+
+    const selectedDeviations = selectedItems
+      .map((itemId) => {
+        const item = allDeviations.find((d) => d.id === itemId);
+        return item ? item.originalDeviation : null;
+      })
+      .filter(Boolean);
+
+    if (selectedDeviations.length === 0) {
+      setBulkActionsAnchorEl(null);
+      return;
+    }
+
+    const deviations = selectedDeviations.map((deviation) => ({
       standardName: deviation.standardName,
       status: status,
       receivedValue: deviation.receivedValue,
@@ -767,17 +834,34 @@ const ManageDriftPage = () => {
   }));
 
   // Calculate compliance metrics for badges
+  // Denied deviations are included in total but not in compliant count (they haven't been fixed yet)
   const totalPolicies =
     processedDriftData.alignedCount +
     processedDriftData.currentDeviationsCount +
     processedDriftData.acceptedDeviationsCount +
-    processedDriftData.customerSpecificDeviations;
+    processedDriftData.customerSpecificDeviations +
+    processedDriftData.deniedDeviationsCount;
 
   const compliancePercentage =
     totalPolicies > 0 ? Math.round((processedDriftData.alignedCount / totalPolicies) * 100) : 0;
 
   const missingLicensePercentage = 0; // This would need to be calculated from actual license data
   const combinedScore = compliancePercentage + missingLicensePercentage;
+
+  // Helper function to get category from standardName
+  const getCategory = (standardName) => {
+    if (!standardName) return "Other Standards";
+    if (standardName.includes("ConditionalAccessTemplate")) return "Conditional Access Policies";
+    if (standardName.includes("IntuneTemplate")) return "Intune Policies";
+
+    // For other standards, look up category in standards.json
+    const standard = standardsData.find((s) => s.name === standardName);
+    if (standard && standard.cat) {
+      return standard.cat;
+    }
+
+    return "Other Standards";
+  };
 
   // Apply search and sort filters
   const applyFilters = (items) => {
@@ -796,6 +880,16 @@ const ManageDriftPage = () => {
       filtered.sort((a, b) => (a.text || "").localeCompare(b.text || ""));
     } else if (sortBy === "status") {
       filtered.sort((a, b) => (a.statusText || "").localeCompare(b.statusText || ""));
+    } else if (sortBy === "category") {
+      // Sort by category, then by name within each category
+      filtered.sort((a, b) => {
+        const catA = getCategory(a.standardName);
+        const catB = getCategory(b.standardName);
+        if (catA !== catB) {
+          return catA.localeCompare(catB);
+        }
+        return (a.text || "").localeCompare(b.text || "");
+      });
     }
 
     return filtered;
@@ -805,6 +899,59 @@ const ManageDriftPage = () => {
   const filteredAcceptedItems = applyFilters(acceptedDeviationItemsWithActions);
   const filteredCustomerSpecificItems = applyFilters(customerSpecificDeviationItemsWithActions);
   const filteredDeniedItems = applyFilters(deniedDeviationItemsWithActions);
+  const filteredAlignedItems = applyFilters(alignedStandardItems);
+
+  // Helper function to render items grouped by category when category sort is active
+  const renderItemsByCategory = (items) => {
+    if (sortBy !== "category" || items.length === 0) {
+      return (
+        <CippBannerListCard
+          items={items}
+          isCollapsible={true}
+          layout={"single"}
+          isFetching={driftApi.isFetching}
+          onSelectionChange={setSelectedItems}
+          selectedItems={selectedItems}
+        />
+      );
+    }
+
+    // Group items by category and collect unique categories
+    const groupedItems = {};
+    items.forEach((item) => {
+      const category = getCategory(item.standardName);
+      if (!groupedItems[category]) {
+        groupedItems[category] = [];
+      }
+      groupedItems[category].push(item);
+    });
+
+    // Sort categories alphabetically
+    const categories = Object.keys(groupedItems).sort();
+
+    return (
+      <Stack spacing={3}>
+        {categories.map((category) => {
+          if (groupedItems[category].length === 0) return null;
+          return (
+            <Box key={category}>
+              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
+                {category}
+              </Typography>
+              <CippBannerListCard
+                items={groupedItems[category]}
+                isCollapsible={true}
+                layout={"single"}
+                isFetching={driftApi.isFetching}
+                onSelectionChange={setSelectedItems}
+                selectedItems={selectedItems}
+              />
+            </Box>
+          );
+        })}
+      </Stack>
+    );
+  };
 
   // Simple filter for drift templates
   const driftTemplateOptions = standardsApi.data
@@ -985,6 +1132,17 @@ const ManageDriftPage = () => {
                         variant="outlined"
                       />
                     </Box>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body2" color="text.secondary">
+                        Denied
+                      </Typography>
+                      <Chip
+                        label={processedDriftData.deniedDeviationsCount}
+                        size="small"
+                        color="error"
+                        variant="outlined"
+                      />
+                    </Box>
                     <Divider />
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" fontWeight={600}>
@@ -1036,11 +1194,20 @@ const ManageDriftPage = () => {
                       options={[
                         { label: "Name", value: "name" },
                         { label: "Status", value: "status" },
+                        { label: "Category", value: "category" },
                       ]}
                       label="Sort by"
                       value={
                         sortBy
-                          ? { label: sortBy === "name" ? "Name" : "Status", value: sortBy }
+                          ? {
+                              label:
+                                sortBy === "name"
+                                  ? "Name"
+                                  : sortBy === "status"
+                                  ? "Status"
+                                  : "Category",
+                              value: sortBy,
+                            }
                           : null
                       }
                       onChange={(newValue) => setSortBy(newValue?.value || "name")}
@@ -1055,7 +1222,9 @@ const ManageDriftPage = () => {
             <Grid size={{ xs: 12, md: 8 }}>
               <Stack spacing={3}>
                 {/* Current Deviations Section */}
-                {filterStatus.some((f) => f.value === "all" || f.value === "current") && (
+                {(!filterStatus ||
+                  filterStatus.length === 0 ||
+                  filterStatus.some((f) => f.value === "all" || f.value === "current")) && (
                   <Box>
                     {/* Header with bulk actions */}
                     <Box
@@ -1064,7 +1233,7 @@ const ManageDriftPage = () => {
                       alignItems="center"
                       sx={{ mb: 2 }}
                     >
-                      <Typography variant="h6">Current Deviations</Typography>
+                      <Typography variant="h6">New Deviations</Typography>
                       {selectedItems.length > 0 && (
                         <Box display="flex" gap={1}>
                           {/* Bulk Actions Dropdown */}
@@ -1116,70 +1285,63 @@ const ManageDriftPage = () => {
                         </Box>
                       )}
                     </Box>
-                    <CippBannerListCard
-                      items={filteredDeviationItems}
-                      isCollapsible={true}
-                      layout={"single"}
-                      isFetching={driftApi.isFetching}
-                      onSelectionChange={setSelectedItems}
-                      selectedItems={selectedItems}
-                    />
+                    {renderItemsByCategory(filteredDeviationItems)}
                   </Box>
                 )}
 
                 {/* Accepted Deviations Section */}
-                {filterStatus.some((f) => f.value === "all" || f.value === "accepted") &&
+                {(!filterStatus ||
+                  filterStatus.length === 0 ||
+                  filterStatus.some((f) => f.value === "all" || f.value === "accepted")) &&
                   filteredAcceptedItems.length > 0 && (
                     <Box>
                       <Typography variant="h6" sx={{ mb: 2 }}>
                         Accepted Deviations
                       </Typography>
-                      <CippBannerListCard
-                        items={filteredAcceptedItems}
-                        isCollapsible={true}
-                        layout={"single"}
-                        isFetching={driftApi.isFetching}
-                        onSelectionChange={setSelectedItems}
-                        selectedItems={selectedItems}
-                      />
+                      {renderItemsByCategory(filteredAcceptedItems)}
                     </Box>
                   )}
 
                 {/* Customer Specific Deviations Section */}
-                {filterStatus.some((f) => f.value === "all" || f.value === "customerspecific") &&
+                {(!filterStatus ||
+                  filterStatus.length === 0 ||
+                  filterStatus.some((f) => f.value === "all" || f.value === "customerspecific")) &&
                   filteredCustomerSpecificItems.length > 0 && (
                     <Box>
                       <Typography variant="h6" sx={{ mb: 2 }}>
                         Accepted Deviations - Customer Specific
                       </Typography>
-                      <CippBannerListCard
-                        items={filteredCustomerSpecificItems}
-                        isCollapsible={true}
-                        layout={"single"}
-                        isFetching={driftApi.isFetching}
-                        onSelectionChange={setSelectedItems}
-                        selectedItems={selectedItems}
-                      />
+                      {renderItemsByCategory(filteredCustomerSpecificItems)}
                     </Box>
                   )}
 
                 {/* Denied Deviations Section */}
-                {filterStatus.some((f) => f.value === "all" || f.value === "denied") &&
+                {(!filterStatus ||
+                  filterStatus.length === 0 ||
+                  filterStatus.some((f) => f.value === "all" || f.value === "denied")) &&
                   filteredDeniedItems.length > 0 && (
                     <Box>
                       <Typography variant="h6" sx={{ mb: 2 }}>
                         Denied Deviations
                       </Typography>
-                      <CippBannerListCard
-                        items={filteredDeniedItems}
-                        isCollapsible={true}
-                        layout={"single"}
-                        isFetching={driftApi.isFetching}
-                        onSelectionChange={setSelectedItems}
-                        selectedItems={selectedItems}
-                      />
+                      {renderItemsByCategory(filteredDeniedItems)}
                     </Box>
                   )}
+
+                {/* Compliant Standards Section - Always shown, not affected by status filter */}
+                {filteredAlignedItems.length > 0 && (
+                  <Box>
+                    <Typography variant="h6" sx={{ mb: 2 }}>
+                      Compliant Standards
+                    </Typography>
+                    <CippBannerListCard
+                      items={filteredAlignedItems}
+                      isCollapsible={true}
+                      layout={"single"}
+                      isFetching={driftApi.isFetching}
+                    />
+                  </Box>
+                )}
               </Stack>
             </Grid>
           </Grid>
