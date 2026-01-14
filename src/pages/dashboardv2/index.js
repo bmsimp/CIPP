@@ -1,15 +1,4 @@
-import {
-  Box,
-  Card,
-  CardContent,
-  CardHeader,
-  Container,
-  Typography,
-  Divider,
-  Button,
-  Skeleton,
-  Tooltip,
-} from "@mui/material";
+import { Box, Card, CardContent, Container, Button, Tooltip } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useForm, useWatch } from "react-hook-form";
@@ -19,17 +8,6 @@ import { ApiGetCall } from "/src/api/ApiCall.jsx";
 import Portals from "/src/data/portals";
 import { BulkActionsMenu } from "/src/components/bulk-actions-menu.js";
 import { ExecutiveReportButton } from "/src/components/ExecutiveReportButton.js";
-import {
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip as RechartsTooltip,
-  LabelList,
-} from "recharts";
 import { TabbedLayout } from "/src/layouts/TabbedLayout";
 import { Layout as DashboardLayout } from "/src/layouts/index.js";
 import tabOptions from "./tabOptions";
@@ -253,18 +231,6 @@ const Page = () => {
                     </Button>
                   </span>
                 </Tooltip>
-                <Button
-                  variant="outlined"
-                  onClick={() => router.push("/dashboardv1")}
-                  sx={{
-                    fontWeight: "bold",
-                    textTransform: "none",
-                    borderRadius: 2,
-                    transition: "all 0.2s ease-in-out",
-                  }}
-                >
-                  Return to old Dashboard
-                </Button>
               </CardContent>
             </Card>
           </Grid>
@@ -425,7 +391,7 @@ const Page = () => {
 };
 
 Page.getLayout = (page) => (
-  <DashboardLayout>
+  <DashboardLayout allTenantsSupport={false}>
     <TabbedLayout tabOptions={tabOptions}>{page}</TabbedLayout>
   </DashboardLayout>
 );
