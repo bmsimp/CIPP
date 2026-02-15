@@ -1,0 +1,10 @@
+[
+  {
+    "label": "View Device",
+    "path": "/endpoint/MEM/devices/device"
+  },
+  {
+    "label": "Windows Defender",
+    "path": "/endpoint/MEM/devices/device/defender"
+  }
+]
