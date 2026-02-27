@@ -44,6 +44,7 @@ const ExecutiveReportDocument = ({
   conditionalAccessData,
   standardsCompareData,
   driftComplianceData,
+  standardTemplatesData,
   sectionConfig = {
     executiveSummary: true,
     securityStandards: true,
@@ -676,7 +677,7 @@ const ExecutiveReportDocument = ({
   });
 
   // PROCESS REAL STANDARDS DATA
-  const processStandardsData = (apiData) => {
+  const processStandardsData = (apiData, standardTemplates) => {
     // Try to fetch standards data dynamically
     let standardsData = null;
     try {
@@ -685,6 +686,65 @@ const ExecutiveReportDocument = ({
 
     if (!apiData || !Array.isArray(apiData) || apiData.length === 0) {
       return [];
+    }
+
+    // Build a lookup map from template configurations
+    // Format: { "GUID": "Display Name" }
+    const templateDisplayNameMap = {};
+
+    if (standardTemplates && Array.isArray(standardTemplates)) {
+      standardTemplates.forEach((template) => {
+        if (template.standards) {
+          // Process IntuneTemplate arrays
+          if (Array.isArray(template.standards.IntuneTemplate)) {
+            template.standards.IntuneTemplate.forEach((templateItem) => {
+              if (templateItem?.TemplateList?.value && templateItem?.TemplateList?.label) {
+                templateDisplayNameMap[templateItem.TemplateList.value.toLowerCase()] =
+                  templateItem.TemplateList.label;
+              }
+              // Handle TemplateList-Tags expansion
+              const tagTemplates =
+                templateItem?.["TemplateList-Tags"]?.addedFields?.templates ||
+                templateItem?.["TemplateList-Tags"]?.rawData?.templates;
+              if (tagTemplates && Array.isArray(tagTemplates)) {
+                tagTemplates.forEach((expandedTemplate) => {
+                  if (
+                    expandedTemplate?.GUID &&
+                    (expandedTemplate?.displayName || expandedTemplate?.name)
+                  ) {
+                    templateDisplayNameMap[expandedTemplate.GUID.toLowerCase()] =
+                      expandedTemplate.displayName || expandedTemplate.name;
+                  }
+                });
+              }
+            });
+          }
+          // Process ConditionalAccessTemplate arrays
+          if (Array.isArray(template.standards.ConditionalAccessTemplate)) {
+            template.standards.ConditionalAccessTemplate.forEach((templateItem) => {
+              if (templateItem?.TemplateList?.value && templateItem?.TemplateList?.label) {
+                templateDisplayNameMap[templateItem.TemplateList.value.toLowerCase()] =
+                  templateItem.TemplateList.label;
+              }
+              // Handle TemplateList-Tags expansion
+              const tagTemplates =
+                templateItem?.["TemplateList-Tags"]?.addedFields?.templates ||
+                templateItem?.["TemplateList-Tags"]?.rawData?.templates;
+              if (tagTemplates && Array.isArray(tagTemplates)) {
+                tagTemplates.forEach((expandedTemplate) => {
+                  if (
+                    expandedTemplate?.GUID &&
+                    (expandedTemplate?.displayName || expandedTemplate?.name)
+                  ) {
+                    templateDisplayNameMap[expandedTemplate.GUID.toLowerCase()] =
+                      expandedTemplate.displayName || expandedTemplate.name;
+                  }
+                });
+              }
+            });
+          }
+        }
+      });
     }
 
     const processedStandards = [];
@@ -698,13 +758,43 @@ const ExecutiveReportDocument = ({
         const standardDef = standardsData?.find((std) => std.name === standardKey);
 
         if (standardDef) {
-          // Determine compliance status
+          // Determine compliance status using the same logic as applied-standards.js
           let status = "Review";
-          if (standardValue && typeof standardValue === "object" && standardValue.Value === true) {
-            status = "Compliant";
-          } else if (standardValue && standardValue.Value === true) {
-            status = "Compliant";
+          let isCompliant = false;
+
+          // FIRST: Check if CurrentValue and ExpectedValue exist and match
+          if (
+            standardValue?.CurrentValue !== undefined &&
+            standardValue?.ExpectedValue !== undefined
+          ) {
+            const sortedCurrent =
+              typeof standardValue.CurrentValue === "object" && standardValue.CurrentValue !== null
+                ? Object.keys(standardValue.CurrentValue)
+                    .sort()
+                    .reduce((obj, key) => {
+                      obj[key] = standardValue.CurrentValue[key];
+                      return obj;
+                    }, {})
+                : standardValue.CurrentValue;
+            const sortedExpected =
+              typeof standardValue.ExpectedValue === "object" &&
+              standardValue.ExpectedValue !== null
+                ? Object.keys(standardValue.ExpectedValue)
+                    .sort()
+                    .reduce((obj, key) => {
+                      obj[key] = standardValue.ExpectedValue[key];
+                      return obj;
+                    }, {})
+                : standardValue.ExpectedValue;
+            isCompliant = JSON.stringify(sortedCurrent) === JSON.stringify(sortedExpected);
           }
+          // SECOND: Check if Value is explicitly true
+          else if (standardValue?.Value === true) {
+            isCompliant = true;
+          }
+
+          status = isCompliant ? "Compliant" : "Review";
+
           // Get tags for display - fix the tags access
           const tags =
             standardDef.tag && Array.isArray(standardDef.tag) && standardDef.tag.length > 0
@@ -720,18 +810,70 @@ const ExecutiveReportDocument = ({
         } else {
           // If no definition found, still add it with basic info
           let status = "Review";
-          if (standardValue && typeof standardValue === "object" && standardValue.Value === true) {
-            status = "Compliant";
-          } else if (standardValue && standardValue.Value === true) {
-            status = "Compliant";
+          let isCompliant = false;
+
+          // FIRST: Check if CurrentValue and ExpectedValue exist and match
+          if (
+            standardValue?.CurrentValue !== undefined &&
+            standardValue?.ExpectedValue !== undefined
+          ) {
+            const sortedCurrent =
+              typeof standardValue.CurrentValue === "object" && standardValue.CurrentValue !== null
+                ? Object.keys(standardValue.CurrentValue)
+                    .sort()
+                    .reduce((obj, key) => {
+                      obj[key] = standardValue.CurrentValue[key];
+                      return obj;
+                    }, {})
+                : standardValue.CurrentValue;
+            const sortedExpected =
+              typeof standardValue.ExpectedValue === "object" &&
+              standardValue.ExpectedValue !== null
+                ? Object.keys(standardValue.ExpectedValue)
+                    .sort()
+                    .reduce((obj, key) => {
+                      obj[key] = standardValue.ExpectedValue[key];
+                      return obj;
+                    }, {})
+                : standardValue.ExpectedValue;
+            isCompliant = JSON.stringify(sortedCurrent) === JSON.stringify(sortedExpected);
+          }
+          // SECOND: Check if Value is explicitly true
+          else if (standardValue?.Value === true) {
+            isCompliant = true;
           }
 
-          // Create a proper name from the key
-          const displayName = standardKey
-            .replace("standards.", "")
-            .replace(/([A-Z])/g, " $1") // Add space before capital letters
-            .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
-            .trim();
+          status = isCompliant ? "Compliant" : "Review";
+
+          // Create a proper name from the key - handle template types specially
+          let displayName = "";
+
+          // Check if this is an IntuneTemplate or ConditionalAccessTemplate
+          const intuneTemplateMatch = standardKey.match(
+            /^standards\.IntuneTemplate\.([0-9a-f-]+)/i,
+          );
+          const caTemplateMatch = standardKey.match(
+            /^standards\.ConditionalAccessTemplate\.([0-9a-f-]+)/i,
+          );
+
+          if (intuneTemplateMatch) {
+            // IntuneTemplate - look up display name from template configurations
+            const guid = intuneTemplateMatch[1];
+            const lookupName = templateDisplayNameMap[guid.toLowerCase()];
+            displayName = lookupName || `Intune Template - ${guid.substring(0, 8)}`;
+          } else if (caTemplateMatch) {
+            // ConditionalAccessTemplate - look up display name from template configurations
+            const guid = caTemplateMatch[1];
+            const lookupName = templateDisplayNameMap[guid.toLowerCase()];
+            displayName = lookupName || `CA Template - ${guid.substring(0, 8)}`;
+          } else {
+            // Regular standard - use basic name formatting
+            displayName = standardKey
+              .replace("standards.", "")
+              .replace(/([A-Z])/g, " $1") // Add space before capital letters
+              .replace(/^./, (str) => str.toUpperCase()) // Capitalize first letter
+              .trim();
+          }
 
           processedStandards.push({
             name: displayName,
@@ -871,7 +1013,7 @@ const ExecutiveReportDocument = ({
     return aggregatedData;
   };
 
-  let securityControls = processStandardsData(standardsCompareData);
+  let securityControls = processStandardsData(standardsCompareData, standardTemplatesData);
   let driftComplianceInfo = processDriftComplianceData(driftComplianceData, standardsCompareData);
 
   const getBadgeStyle = (status) => {
@@ -2633,6 +2775,14 @@ export const ExecutiveReportButton = (props) => {
     waiting: previewOpen,
   });
 
+  // Load all standard templates to resolve template display names
+  const standardTemplatesData = ApiGetCall({
+    url: `/api/listStandardTemplates`,
+    data: {}, // No templateId filter - get all templates
+    queryKey: `standard-templates-report-all`,
+    waiting: previewOpen,
+  });
+
   // Check if all data is loaded (either successful or failed) - only relevant when preview is open
   const isDataLoading =
     previewOpen &&
@@ -2643,7 +2793,8 @@ export const ExecutiveReportButton = (props) => {
       deviceData.isFetching ||
       conditionalAccessData.isFetching ||
       standardsCompareData.isFetching ||
-      driftComplianceData.isFetching);
+      driftComplianceData.isFetching ||
+      standardTemplatesData.isFetching);
 
   const hasAllDataFinished =
     !previewOpen ||
@@ -2654,7 +2805,8 @@ export const ExecutiveReportButton = (props) => {
       (deviceData.isSuccess || deviceData.isError) &&
       (conditionalAccessData.isSuccess || conditionalAccessData.isError) &&
       (standardsCompareData.isSuccess || standardsCompareData.isError) &&
-      (driftComplianceData.isSuccess || driftComplianceData.isError));
+      (driftComplianceData.isSuccess || driftComplianceData.isError) &&
+      (standardTemplatesData.isSuccess || standardTemplatesData.isError));
 
   // Button is always available now since we don't need to wait for data
   const shouldShowButton = true;
@@ -2712,6 +2864,9 @@ export const ExecutiveReportButton = (props) => {
           }
           standardsCompareData={standardsCompareData.isSuccess ? standardsCompareData?.data : null}
           driftComplianceData={driftComplianceData.isSuccess ? driftComplianceData?.data : null}
+          standardTemplatesData={
+            standardTemplatesData.isSuccess ? standardTemplatesData?.data : null
+          }
           sectionConfig={sectionConfig}
         />
       );
