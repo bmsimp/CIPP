@@ -812,9 +812,22 @@ export const nativeMenuItems = [
       "Tenant.Application.*",
       "Tenant.DomainAnalyser.*",
       "Exchange.Mailbox.*",
+      "Endpoint.MEM.*",
       "CIPP.Scheduler.*",
     ],
     items: [
+      {
+        title: "Intune Tools",
+        permissions: ["Endpoint.MEM.*"],
+        items: [
+          {
+            title: "Compare Policies",
+            path: "/endpoint/MEM/compare-policies",
+            permissions: ["Endpoint.MEM.*"],
+            scope: "global",
+          },
+        ],
+      },
       {
         title: "Tenant Tools",
         permissions: ["Tenant.Administration.*"],
@@ -957,6 +970,12 @@ export const nativeMenuItems = [
         roles: ["admin", "superadmin"],
         permissions: ["CIPP.AppSettings.*"],
         scope: "global",
+      },
+      {
+        title: "Custom Scripts",
+        path: "/cipp/custom-scripts",
+        roles: ["admin", "superadmin"],
+        permissions: ["CIPP.Alert.*"],
       },
       {
         title: "Advanced",
