@@ -319,13 +319,77 @@ const htmlToElements = (html, s) => {
     ]
   const elements = []
   let key = 0
-  const blocks = html
+
+  // Extract and render tables first, replacing them with placeholders
+  let remaining = html
+  const tables = []
+  const tableRegex = /<table[^>]*>([\s\S]*?)<\/table>/gi
+  remaining = remaining.replace(tableRegex, (match) => {
+    const placeholder = `__TABLE_${tables.length}__`
+    tables.push(match)
+    return `<p>${placeholder}</p>`
+  })
+
+  const blocks = remaining
     .split(/<\/p>|<\/h[1-6]>|<\/li>|<\/pre>|<\/blockquote>|<br\s*\/?>/)
     .filter((b) => b.trim())
 
   for (const block of blocks) {
     const cleaned = block.trim()
     if (!cleaned) continue
+
+    // Check for table placeholder
+    const tablePlaceholder = cleaned.match(/__TABLE_(\d+)__/)
+    if (tablePlaceholder) {
+      const tableIndex = parseInt(tablePlaceholder[1], 10)
+      const tableHtml = tables[tableIndex]
+      if (tableHtml) {
+        // Parse rows from HTML table
+        const allRows = []
+        const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
+        let rowMatch
+        while ((rowMatch = rowRegex.exec(tableHtml)) !== null) {
+          const cells = []
+          const cellRegex = /<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi
+          let cellMatch
+          while ((cellMatch = cellRegex.exec(rowMatch[1])) !== null) {
+            cells.push(stripTags(cellMatch[1]).trim())
+          }
+          if (cells.length > 0) allRows.push(cells)
+        }
+
+        if (allRows.length > 0) {
+          const headerRow = allRows[0]
+          const dataRows = allRows.slice(1)
+          // Check if the first row was in <thead> (it's a header)
+          const hasHeader = /<thead/i.test(tableHtml)
+          elements.push(
+            <View key={key++} style={s.controlsTable}>
+              {hasHeader && (
+                <View style={s.tableHeader}>
+                  {headerRow.map((c, ci) => (
+                    <Text key={ci} style={s.headerCell}>
+                      {processInline(c)}
+                    </Text>
+                  ))}
+                </View>
+              )}
+              {(hasHeader ? dataRows : allRows).map((row, ri) => (
+                <View key={ri} style={ri % 2 === 0 ? s.tableRow : s.tableRowAlt}>
+                  {row.map((c, ci) => (
+                    <Text key={ci} style={ci === 0 ? s.tableCellBold : s.tableCell}>
+                      {processInline(c)}
+                    </Text>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )
+        }
+        continue
+      }
+    }
+
     if (cleaned.match(/<h1[^>]*>/)) {
       elements.push(
         <Text key={key++} style={s.heading1}>
@@ -577,21 +641,16 @@ export const ReportBuilderDocument = ({
         </View>
       </Page>
 
-      {/* ── Content Pages — one Page per block, matching Executive Report pattern ── */}
-      {safeBlocks.map((block, index) => {
-        const statusStyle =
-          block.status === 'Passed'
-            ? s.statusPassed
-            : block.status === 'Failed'
-              ? s.statusFailed
-              : block.status === 'Investigate'
-                ? s.statusInvestigate
-                : block.status === 'Skipped'
-                  ? s.statusSkipped
-                  : null
-
-        return (
-          <Page key={index} size="A4" style={s.page}>
+      {/* ── Content Pages — blocks batched 5 per page ── */}
+      {(() => {
+        const BLOCKS_PER_PAGE = 5
+        const groups = []
+        for (let i = 0; i < safeBlocks.length; i += BLOCKS_PER_PAGE) {
+          groups.push(safeBlocks.slice(i, i + BLOCKS_PER_PAGE))
+        }
+        if (groups.length === 0) groups.push([])
+        return groups.map((group, pageIndex) => (
+          <Page key={pageIndex} size="A4" style={s.page}>
             <View style={s.pageHeader}>
               <View style={s.pageHeaderContent}>
                 <Text style={s.pageTitle}>{reportName}</Text>
@@ -601,18 +660,33 @@ export const ReportBuilderDocument = ({
             </View>
             <View style={s.pageHeaderDivider} />
 
-            <View style={s.section}>
-              {block.title ? <Text style={s.sectionTitle}>{block.title}</Text> : null}
-              {block.type === 'test' && block.status ? (
-                <Text style={{ ...s.statusText, ...statusStyle }}>Status: {block.status}</Text>
-              ) : null}
-              {block.type === 'blank' || (block.type === 'test' && block.static)
-                ? htmlToElements(block.content, s)
-                : markdownToElements(block.content, s)}
-            </View>
+            {group.map((block, blockIndex) => {
+              const statusStyle =
+                block.status === 'Passed'
+                  ? s.statusPassed
+                  : block.status === 'Failed'
+                    ? s.statusFailed
+                    : block.status === 'Investigate'
+                      ? s.statusInvestigate
+                      : block.status === 'Skipped'
+                        ? s.statusSkipped
+                        : null
+
+              return (
+                <View key={blockIndex} style={s.section}>
+                  {block.title ? <Text style={s.sectionTitle}>{block.title}</Text> : null}
+                  {block.type === 'test' && block.status ? (
+                    <Text style={{ ...s.statusText, ...statusStyle }}>Status: {block.status}</Text>
+                  ) : null}
+                  {block.type === 'blank' || (block.type === 'test' && block.static)
+                    ? htmlToElements(block.content, s)
+                    : markdownToElements(block.content, s)}
+                </View>
+              )
+            })}
           </Page>
-        )
-      })}
+        ))
+      })()}
     </Document>
   )
 }
