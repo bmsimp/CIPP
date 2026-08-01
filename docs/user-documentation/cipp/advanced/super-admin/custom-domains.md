@@ -1,5 +1,11 @@
 # Custom Domains
 
+{% hint style="info" %}
+## CyberDrain Hosted Next Generation Migration
+
+For those who have just migrated to the next generation of CIPP infrastructure, you must use the [management portal](https://management.cipp.app/) to readd your custom domain as CIPP itself is missing some of the permissions to manage the move of the domain from your old instance.
+{% endhint %}
+
 The Custom Domains page maps custom domains onto the Azure App Service that hosts this CIPP instance, so you can reach CIPP on your own hostname instead of the default `*.azurewebsites.net` address. Setting up a domain involves a DNS ownership record and an alias record, a hostname binding on the App Service, and an optional free managed TLS certificate. A wizard walks through all three and can be reopened at any time to finish or fix a domain. The default `*.azurewebsites.net` hostname always remains available.
 
 ## App Service Details
@@ -11,7 +17,7 @@ The App Service card shows the read-only details you need when creating DNS reco
 | Site name              | The name of the App Service hosting this CIPP instance.                                                 |
 | Default hostname       | The App Service's default hostname. Use this as the CNAME target when adding a subdomain.               |
 | Inbound IP (A record)  | The App Service's inbound IP address. Use this as the A record value when adding an apex (root) domain. |
-| Domain verification ID | The value used in the ownership TXT record (at `asuid.<domain>`) to prove you control the domain.       |
+| Domain verification ID | The value for the ownership TXT record (at `asuid.<domain>`). Only needed for apex, wildcard, or proxied domains — a subdomain CNAME proves ownership on its own. |
 
 ## Table Details
 
@@ -36,10 +42,14 @@ Select **Add Custom Domain** to start the wizard, or use **Manage / Fix** on an 
 
 Enter the fully qualified domain CIPP should answer on. This can be a subdomain (for example `portal.contoso.com`), an apex domain (`contoso.com`), or a wildcard (`*.contoso.com`). The wizard then lists the DNS records to create at your DNS provider:
 
-* An **Ownership** TXT record at `asuid.<domain>`, set to the domain verification ID.
 * An **Alias** record: a CNAME pointing to the App Service default hostname for a subdomain, or an A record pointing to the inbound IP for an apex domain.
+* For apex and wildcard domains only, an **Ownership** TXT record at `asuid.<domain>`, set to the domain verification ID. A subdomain's CNAME proves ownership on its own, so no TXT record is needed there.
 
-Create the records, then select **Check DNS** to verify them. Once ownership is confirmed you can continue. Two situations are handled gracefully: a wildcard domain is verified by ownership alone (its alias is validated by Azure when the binding is created), and a proxied alias — such as a Cloudflare "orange-cloud" record — may not be visible to the check, in which case you can still continue and Azure makes the final check at binding time.
+Create the records, then select **Check DNS** to verify them. Once verified you can continue. Two situations are handled gracefully: a wildcard domain is verified by ownership alone (its alias is validated by Azure when the binding is created), and a proxied alias — such as a Cloudflare "orange-cloud" record — is not visible to the check, in which case the wizard asks for the ownership TXT record instead and Azure makes the final check at binding time.
+
+{% hint style="warning" %}
+If an `asuid.<domain>` TXT record exists from a previous setup with a different value, **remove it**. A stale verification record blocks Azure's validation even when the CNAME is correct.
+{% endhint %}
 {% endstep %}
 
 {% step %}
