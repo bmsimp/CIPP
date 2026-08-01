@@ -13,6 +13,7 @@ Thumbs.db
 
 # Local settings (contains secrets)
 .env
+build/tools/local.settings.json
 
 # Runtime-generated files
 _startup.ps1
@@ -26,5 +27,7 @@ backend/Config/function-parameters.json*
 localfiles/
 
 graphify-out/
+graphify/
 .claude/
 CLAUDE.md
+AGENTS.md
