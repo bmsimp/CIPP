@@ -1,64 +1,64 @@
 {
   "name": "sharingCapability",
-  "label": "Set SharePoint sharing level",
+  "label": "Set Sharing Level for OneDrive and SharePoint",
   "cat": "SharePoint Standards",
   "tag": [
-    "CIS M365 7.0.0 (7.2.3)"
+    "CIS M365 7.0.0 (7.2.3)",
+    "CIS M365 7.0.0 (7.2.4)",
+    "CISA (MS.AAD.14.1v1)",
+    "CISA (MS.SPO.1.1v1)"
   ],
   "impact": "High Impact",
-  "helpText": "Sets the tenant-wide SharePoint and OneDrive external sharing level.",
-  "executiveText": "Controls how far documents can be shared outside the company.",
+  "helpText": "Sets the default sharing level for OneDrive and SharePoint. This is a tenant wide setting and overrules any settings set on the site level",
+  "executiveText": "Defines the organization's default policy for sharing files and folders in SharePoint and OneDrive, balancing collaboration needs with security requirements. This fundamental setting determines whether employees can share with external users, anonymous links, or only internal colleagues.",
   "recommendedBy": [
-    "CIS"
+    "CIS",
+    "CIPP"
   ],
   "requiredCapabilities": [
+    "SHAREPOINTWAC",
+    "SHAREPOINTSTANDARD",
     "SHAREPOINTENTERPRISE",
-    "SHAREPOINTSTANDARD"
+    "SHAREPOINTENTERPRISE_EDU",
+    "ONEDRIVE_BASIC",
+    "ONEDRIVE_ENTERPRISE"
   ],
-  "secureScoreImpact": 10,
+  "secureScoreImpact": 0,
   "compare": "subset",
   "variables": {
-    "level": {
+    "sharingCapability": {
       "type": "autoComplete",
-      "label": "Sharing level",
+      "label": "Select Sharing Level",
       "options": [
         {
-          "label": "Only people in your organization",
-          "value": "Disabled"
+          "label": "Users can share only with people in the organization. No external sharing is allowed.",
+          "value": 0
         },
         {
-          "label": "Existing guests only",
-          "value": "ExistingExternalUserSharingOnly"
+          "label": "Users can share with new and existing guests. Guests must sign in or provide a verification code.",
+          "value": 1
         },
         {
-          "label": "New and existing guests",
-          "value": "ExternalUserSharingOnly"
+          "label": "Users can share with anyone by using links that do not require sign-in.",
+          "value": 2
         },
         {
-          "label": "Anyone (including anonymous links)",
-          "value": "ExternalUserAndGuestSharing"
+          "label": "Users can share with existing guests (those already in the directory of the organization).",
+          "value": 3
         }
-      ],
-      "default": "ExternalUserSharingOnly",
-      "recommended": "ExternalUserSharingOnly"
+      ]
     }
   },
   "expected": {
-    "SharingCapability": "%level%"
+    "SharingCapability": "%sharingCapability%"
   },
   "read": {
     "cacheType": "SPOTenant"
   },
   "remediate": {
-    "executor": "GraphRequest",
-    "requests": [
-      {
-        "method": "PATCH",
-        "uri": "admin/sharepoint/settings",
-        "body": {
-          "SharingCapability": "%level%"
-        }
-      }
-    ]
+    "executor": "SPOTenant",
+    "properties": {
+      "SharingCapability": "%sharingCapability%"
+    }
   }
 }

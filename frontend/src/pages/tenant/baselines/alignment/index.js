@@ -24,6 +24,7 @@ import {
   TimelineOppositeContent,
   TimelineSeparator,
 } from '@mui/lab'
+import { Grid } from '@mui/system'
 import { useState } from 'react'
 import {
   BuildingOfficeIcon,
@@ -78,6 +79,7 @@ import { parseCippDate } from '../../../../utils/parse-cipp-date'
 const deviationColors = {
   Compliant: 'success',
   Accepted: 'info',
+  'Partially Accepted': 'warning',
   Drift: 'error',
   'Denied - Remediate Pending': 'warning',
   'Denied - Delete Pending': 'warning',
@@ -372,6 +374,8 @@ const Page = () => {
       // value regardless of the current state, and a license bought after the last run
       // should not block trying. Manual tasks have nothing to deploy.
       condition: (row) => !row.standardName.startsWith('ManualTask'),
+      hideCondition: (row) => row.standardName.startsWith('ManualTask'),
+      bulkFilterEligible: true,
     },
     {
       label: 'Compare Now',
@@ -389,6 +393,8 @@ const Page = () => {
       multiPost: false,
       relatedQueryKeys,
       condition: (row) => !row.standardName.startsWith('ManualTask'),
+      hideCondition: (row) => row.standardName.startsWith('ManualTask'),
+      bulkFilterEligible: true,
     },
     {
       label: 'Accept Deviation',
@@ -408,7 +414,10 @@ const Page = () => {
       relatedQueryKeys,
       // Manual tasks are completed, not triaged.
       condition: (row) =>
-        row.status === 'Drift' && !row.standardName.startsWith('ManualTask'),
+        ['Drift', 'Partially Accepted'].includes(row.status) &&
+        !row.standardName.startsWith('ManualTask'),
+      hideCondition: (row) => row.standardName.startsWith('ManualTask'),
+      bulkFilterEligible: true,
     },
     {
       label: 'Deny Deviation',
@@ -437,7 +446,10 @@ const Page = () => {
       multiPost: false,
       relatedQueryKeys,
       condition: (row) =>
-        row.status === 'Drift' && !row.standardName.startsWith('ManualTask'),
+        ['Drift', 'Partially Accepted'].includes(row.status) &&
+        !row.standardName.startsWith('ManualTask'),
+      hideCondition: (row) => row.standardName.startsWith('ManualTask'),
+      bulkFilterEligible: true,
     },
     {
       label: 'Clear Triage Status',
@@ -451,12 +463,18 @@ const Page = () => {
         standard: 'standardName',
       },
       confirmText:
-        'Clear the Accept/Deny status on [standardLabel]? The deviation re-surfaces as Drift on the next run.',
+        'Clear the Accept/Deny status and any accepted properties on [standardLabel]? The deviation re-surfaces as Drift on the next run.',
       multiPost: false,
       relatedQueryKeys,
+      // Also offered when only sub-object/property acceptances exist - clearing is the
+      // one way to delete those.
       condition: (row) =>
-        (row.status === 'Accepted' || row.status?.startsWith('Denied')) &&
+        (['Accepted', 'Partially Accepted'].includes(row.status) ||
+          row.status?.startsWith('Denied') ||
+          Object.keys(row.acceptedPaths ?? {}).length > 0) &&
         !row.standardName.startsWith('ManualTask'),
+      hideCondition: (row) => row.standardName.startsWith('ManualTask'),
+      bulkFilterEligible: true,
     },
     {
       label: 'Mark Task Complete',
@@ -473,8 +491,11 @@ const Page = () => {
         'Mark the manual task [standardLabel] as completed for [tenantFilter]? A new deviation is raised again on the configured recurrence.',
       multiPost: false,
       relatedQueryKeys,
+      // Instance keys are 'ManualTask#n' - an exact match missed every instance but the first.
       condition: (row) =>
-        row.standardName === 'ManualTask' && row.status === 'Drift',
+        row.standardName.startsWith('ManualTask') && row.status === 'Drift',
+      hideCondition: (row) => !row.standardName.startsWith('ManualTask'),
+      bulkFilterEligible: true,
     },
     {
       label: 'Create Tenant Override',
@@ -527,6 +548,7 @@ const Page = () => {
           Object.keys(standard?.variables ?? {}).length > 0
         )
       },
+      hideCondition: (row) => row.standardName.startsWith('ManualTask'),
     },
     {
       label: 'Remove Tenant Override',
@@ -545,6 +567,7 @@ const Page = () => {
       multiPost: false,
       relatedQueryKeys,
       condition: (row) => row.sourceTemplate === 'Tenant Override',
+      hideCondition: (row) => row.standardName.startsWith('ManualTask'),
     },
   ]
 
@@ -996,14 +1019,18 @@ const Page = () => {
                   {tenantRow.deviationReason}
                 </Typography>
               )}
-              {(['Drift', 'Denied - Remediate Pending'].includes(
-                tenantRow.status
-              ) ||
+              {([
+                'Drift',
+                'Partially Accepted',
+                'Denied - Remediate Pending',
+              ].includes(tenantRow.status) ||
                 tenantRow.sourceTemplate === 'Tenant Override') && (
                 <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  {['Drift', 'Denied - Remediate Pending'].includes(
-                    tenantRow.status
-                  ) && (
+                  {[
+                    'Drift',
+                    'Partially Accepted',
+                    'Denied - Remediate Pending',
+                  ].includes(tenantRow.status) && (
                     <>
                       <Button
                         size="small"
@@ -1316,114 +1343,129 @@ const Page = () => {
   )
 
   const rolloutCard = (
-    <CippButtonCard title={`Staged Rollout - ${tenant.displayName}`}>
-      <Stack spacing={1.5}>
-        {stageStates.length === 0 && (
-          <Typography variant="body2" color="text.secondary">
-            No staged baselines are assigned to this tenant.
-          </Typography>
-        )}
-        {stageStates.map((state) => (
-          <Box
-            key={state.templateId}
-            sx={{
-              p: 1.5,
-              borderRadius: '12px',
-              border: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'background.paper',
-            }}
-          >
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              spacing={1}
-              alignItems={{ xs: 'flex-start', md: 'center' }}
-              justifyContent="space-between"
-            >
-              <Box sx={{ minWidth: 0 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }} noWrap>
-                  {state.templateName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Entered{' '}
-                  {parseCippDate(state.enteredStageAt).toLocaleDateString()}
-                </Typography>
-              </Box>
-              <Stack direction="row" spacing={1} alignItems="center">
-                {state.alignedPercentage !== null && (
-                  <Tooltip title="Alignment against the standards this baseline has rolled out to this tenant so far">
-                    <Chip
-                      variant="outlined"
-                      size="small"
-                      color={
-                        state.alignedPercentage === 100 ? 'success' : 'warning'
-                      }
-                      label={`${state.alignedPercentage}% aligned`}
-                    />
-                  </Tooltip>
-                )}
-                <Chip
-                  variant="outlined"
-                  size="small"
-                  color={state.nextStage ? 'info' : 'success'}
-                  label={`Stage ${state.currentStage} of ${state.totalStages}: ${state.stageName}`}
-                />
-                {!state.nextStage && (
+    <CippButtonCard title={`Assigned Templates - ${tenant.displayName}`}>
+      {stageStates.length === 0 && (
+        <Typography variant="body2" color="text.secondary">
+          No baselines are assigned to this tenant.
+        </Typography>
+      )}
+      <Grid container spacing={1.5}>
+        {[...stageStates]
+          .sort((a, b) =>
+            String(a.templateName).localeCompare(String(b.templateName))
+          )
+          .map((state) => (
+            <Grid key={state.templateId} size={{ xs: 12, md: 4 }}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: '12px',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 600 }}
+                    noWrap
+                  >
+                    {state.templateName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Entered{' '}
+                    {parseCippDate(state.enteredStageAt).toLocaleDateString()}
+                  </Typography>
+                </Box>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  flexWrap="wrap"
+                  useFlexGap
+                  sx={{ mt: 1 }}
+                >
+                  {state.alignedPercentage !== null && (
+                    <Tooltip title="Alignment against the standards this baseline has rolled out to this tenant so far">
+                      <Chip
+                        variant="outlined"
+                        size="small"
+                        color={
+                          state.alignedPercentage === 100
+                            ? 'success'
+                            : 'warning'
+                        }
+                        label={`${state.alignedPercentage}% aligned`}
+                      />
+                    </Tooltip>
+                  )}
                   <Chip
                     variant="outlined"
                     size="small"
-                    color="success"
-                    label="Final stage"
+                    color={state.nextStage ? 'info' : 'success'}
+                    label={`Stage ${state.currentStage} of ${state.totalStages}: ${state.stageName}`}
                   />
-                )}
-                {state.manualAdvance && (
-                  <Tooltip title="The next stage requires manual approval">
+                  {!state.nextStage && (
                     <Chip
                       variant="outlined"
                       size="small"
-                      color="warning"
-                      label="Awaiting approval"
+                      color="success"
+                      label="Final stage"
                     />
-                  </Tooltip>
-                )}
-              </Stack>
-            </Stack>
-            {state.nextStage && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ display: 'block', mt: 1 }}
-              >
-                Next: Stage {state.currentStage + 1} ({state.nextStageName}) -
-                advances when {describeStageConditions(state.nextStage)}
-              </Typography>
-            )}
-            {state.manualAdvance && (
-              <>
-                <Divider sx={{ my: 1 }} />
-                <Stack direction="row" justifyContent="flex-end">
-                  <Button
-                    size="small"
-                    variant="contained"
-                    startIcon={<ArrowForward />}
-                    onClick={() => {
-                      setAdvanceTarget({
-                        tenantFilter: tenant.tenantId,
-                        templateId: state.templateId,
-                        templateName: state.templateName,
-                        nextStageName: state.nextStageName,
-                      })
-                      advanceDialog.handleOpen()
-                    }}
-                  >
-                    Move to next stage ({state.nextStageName})
-                  </Button>
+                  )}
+                  {state.manualAdvance && (
+                    <Tooltip title="The next stage requires manual approval">
+                      <Chip
+                        variant="outlined"
+                        size="small"
+                        color="warning"
+                        label="Awaiting approval"
+                      />
+                    </Tooltip>
+                  )}
                 </Stack>
-              </>
-            )}
-          </Box>
-        ))}
-      </Stack>
+                {state.nextStage && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block', mt: 1 }}
+                  >
+                    Next: Stage {state.currentStage + 1} ({state.nextStageName})
+                    - advances when {describeStageConditions(state.nextStage)}
+                  </Typography>
+                )}
+                {state.manualAdvance && (
+                  <>
+                    <Box sx={{ flexGrow: 1 }} />
+                    <Divider sx={{ my: 1 }} />
+                    <Stack direction="row" justifyContent="flex-end">
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<ArrowForward />}
+                        onClick={() => {
+                          setAdvanceTarget({
+                            tenantFilter: tenant.tenantId,
+                            templateId: state.templateId,
+                            templateName: state.templateName,
+                            nextStageName: state.nextStageName,
+                          })
+                          advanceDialog.handleOpen()
+                        }}
+                      >
+                        Move to next stage ({state.nextStageName})
+                      </Button>
+                    </Stack>
+                  </>
+                )}
+              </Box>
+            </Grid>
+          ))}
+      </Grid>
     </CippButtonCard>
   )
 
