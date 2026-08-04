@@ -1,19 +1,34 @@
 import {
+  Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   Chip,
+  CircularProgress,
   Container,
   Divider,
+  Link,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material'
+import {
+  Timeline,
+  TimelineConnector,
+  TimelineContent,
+  TimelineDot,
+  TimelineItem,
+  TimelineOppositeContent,
+  TimelineSeparator,
+} from '@mui/lab'
 import { useState } from 'react'
 import {
   BuildingOfficeIcon,
   CheckBadgeIcon,
+  ClockIcon,
   ExclamationTriangleIcon,
   KeyIcon,
   RectangleStackIcon,
@@ -22,15 +37,20 @@ import {
 } from '@heroicons/react/24/outline'
 import {
   ArrowForward,
+  BuildOutlined,
+  Cancel,
   CheckCircle,
+  CheckCircleOutlined,
   Compare,
   Edit,
+  ErrorOutlineOutlined,
+  InfoOutlined,
   LayersClear,
   PlayArrow,
   RemoveCircle,
   TaskAlt,
   Tune,
-  VolumeOff,
+  WarningAmberOutlined,
 } from '@mui/icons-material'
 import { Layout as DashboardLayout } from '../../../../layouts/index.js'
 import { TabbedLayout } from '../../../../layouts/TabbedLayout'
@@ -41,7 +61,9 @@ import { CippHead } from '../../../../components/CippComponents/CippHead'
 import { CippInfoBar } from '../../../../components/CippCards/CippInfoBar'
 import CippButtonCard from '../../../../components/CippCards/CippButtonCard'
 import { CippApiDialog } from '../../../../components/CippComponents/CippApiDialog'
+import { CippApiLogsDrawer } from '../../../../components/CippComponents/CippApiLogsDrawer'
 import CippFormComponent from '../../../../components/CippComponents/CippFormComponent'
+import { CippFormTemplateTenantSelector } from '../../../../components/CippComponents/CippFormTemplateTenantSelector'
 import CippBaselineWhatIfReport, {
   describeStageConditions,
 } from '../../../../components/CippBaselines/CippBaselineWhatIfReport'
@@ -56,9 +78,10 @@ import { parseCippDate } from '../../../../utils/parse-cipp-date'
 const deviationColors = {
   Compliant: 'success',
   Accepted: 'info',
-  Detected: 'error',
-  Suppressed: 'warning',
-  'License Missing': 'default',
+  Drift: 'error',
+  'Denied - Remediate Pending': 'warning',
+  'Denied - Delete Pending': 'warning',
+  'Skipped - No License': 'default',
   'No Data': 'default',
 }
 
@@ -103,6 +126,99 @@ const propertyList = (properties) => (
   </Stack>
 )
 
+// The API serializes single-element arrays as a bare object; the selector needs a real array.
+const asOptionArray = (value) =>
+  (Array.isArray(value) ? value : value ? [value] : []).filter(
+    (entry) => entry && typeof entry === 'object' && entry.value
+  )
+
+const runModeLabels = {
+  run: 'Full run',
+  compare: 'Compare',
+  oneoff: 'One-off remediation',
+}
+
+// Timeline dot/chip styling per run outcome, mirroring the manage-tenant history page.
+const outcomeTimeline = {
+  Compliant: {
+    color: 'success',
+    chipColor: 'success',
+    icon: <CheckCircleOutlined />,
+  },
+  Remediated: { color: 'info', chipColor: 'info', icon: <BuildOutlined /> },
+  Drift: {
+    color: 'warning',
+    chipColor: 'error',
+    icon: <WarningAmberOutlined />,
+  },
+  Error: { color: 'error', chipColor: 'error', icon: <ErrorOutlineOutlined /> },
+  'Skipped-NoCache': {
+    color: 'grey',
+    chipColor: 'default',
+    icon: <InfoOutlined />,
+  },
+  'Skipped-License': {
+    color: 'grey',
+    chipColor: 'default',
+    icon: <InfoOutlined />,
+  },
+}
+
+// One readable sentence per run event for the historic timeline.
+const historyEventMessage = (event) => {
+  switch (event.outcome) {
+    case 'Remediated':
+      return `Successfully changed "${event.standardLabel}" to the expected configuration`
+    case 'Compliant':
+      return `Verified "${event.standardLabel}" is compliant with the baseline`
+    case 'Drift':
+      return `Detected drift on "${event.standardLabel}"`
+    case 'Error':
+      return `Failed to change "${event.standardLabel}" - see the logs for this run`
+    case 'Skipped-License':
+      return `Skipped "${event.standardLabel}" - the tenant is not licensed for it`
+    case 'Skipped-NoCache':
+      return `Skipped "${event.standardLabel}" - no data collected yet`
+    default:
+      return `"${event.standardLabel}" - ${event.outcome}`
+  }
+}
+
+// A run's diff can be long - hide it behind a toggle so the history list stays readable.
+const RunDetails = ({ diff }) => {
+  const [open, setOpen] = useState(false)
+  if (!diff) return null
+  const entries = Array.isArray(diff) ? diff : [diff]
+  return (
+    <>
+      <Button
+        size="small"
+        variant="outlined"
+        sx={{ mt: 1 }}
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        {open ? 'Hide run details' : 'View details of this run'}
+      </Button>
+      {open &&
+        entries.map((entry, index) => (
+          <Typography
+            key={entry?.Property ?? index}
+            variant="caption"
+            sx={{
+              fontFamily: 'monospace',
+              display: 'block',
+              mt: 0.5,
+              wordBreak: 'break-word',
+            }}
+          >
+            {entry?.Property}: expected {JSON.stringify(entry?.ExpectedValue)},
+            found {JSON.stringify(entry?.ReceivedValue)}
+          </Typography>
+        ))}
+    </>
+  )
+}
+
 const jsonBox = (value, isCompliant) => (
   <Box
     sx={{
@@ -142,6 +258,18 @@ const Page = () => {
   const acceptPathDialog = useDialog()
   const [removeOverrideTarget, setRemoveOverrideTarget] = useState(null)
   const removeOverrideDialog = useDialog()
+  const [expandedEvents, setExpandedEvents] = useState(new Set())
+  const toggleEventExpansion = (index) => {
+    setExpandedEvents((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) {
+        next.delete(index)
+      } else {
+        next.add(index)
+      }
+      return next
+    })
+  }
   const isTenantView = viewMode === 'tenant'
   const isTemplateView = viewMode === 'template'
 
@@ -160,7 +288,13 @@ const Page = () => {
     url: '/api/ListBaselineAlignment',
     data: { byStandard: true },
     queryKey: 'ListBaselineAlignment-byStandard',
-    waiting: !isTenantView && !isTemplateView,
+    waiting: viewMode === 'standard',
+  })
+  const historyApi = ApiGetCall({
+    url: '/api/ListBaselineAlignment',
+    data: { tenantFilter: currentTenant, history: true },
+    queryKey: `ListBaselineAlignment-${currentTenant}-history`,
+    waiting: viewMode === 'history' && !!currentTenant,
   })
   const baselinesApi = ApiGetCall({
     url: '/api/ListBaselines',
@@ -183,8 +317,8 @@ const Page = () => {
     licenseMissing: 0,
     compliant: 0,
     accepted: 0,
-    detected: 0,
-    suppressed: 0,
+    drift: 0,
+    denied: 0,
     verifiedPercentage: 0,
     alignedPercentage: 0,
     acceptedPercentage: 0,
@@ -234,8 +368,10 @@ const Page = () => {
         'Deploy the expected value of [standardLabel] to [tenantFilter]? This runs a one-off remediation from the configured expected value.',
       multiPost: false,
       relatedQueryKeys,
-      condition: (row) =>
-        ['Detected', 'Suppressed'].includes(row.deviationState),
+      // Running remediation by hand is always possible - the engine deploys the expected
+      // value regardless of the current state, and a license bought after the last run
+      // should not block trying. Manual tasks have nothing to deploy.
+      condition: (row) => !row.standardName.startsWith('ManualTask'),
     },
     {
       label: 'Compare Now',
@@ -252,6 +388,7 @@ const Page = () => {
         'Run a compare-only pass of [standardLabel] against [tenantFilter]? No changes will be made.',
       multiPost: false,
       relatedQueryKeys,
+      condition: (row) => !row.standardName.startsWith('ManualTask'),
     },
     {
       label: 'Accept Deviation',
@@ -269,28 +406,41 @@ const Page = () => {
         'Accept the current deviation on [standardLabel]? The tenant counts as aligned, and alerts are silenced until the acceptance expires.',
       multiPost: false,
       relatedQueryKeys,
-      condition: (row) => row.deviationState === 'Detected',
+      // Manual tasks are completed, not triaged.
+      condition: (row) =>
+        row.status === 'Drift' && !row.standardName.startsWith('ManualTask'),
     },
     {
-      label: 'Suppress Alerts',
+      label: 'Deny Deviation',
       type: 'POST',
       url: '/api/ExecUpdateBaselineDeviation',
-      icon: <VolumeOff />,
+      icon: <Cancel />,
       color: 'warning',
       data: {
-        action: '!Suppress',
+        action: '!Deny',
+        method: '!remediate',
         tenantFilter: 'tenantFilter',
         standard: 'standardName',
       },
-      children: triageFormFields,
+      children: ({ formHook }) => (
+        <Stack spacing={2} sx={{ mt: 2 }}>
+          <CippFormComponent
+            type="textField"
+            name="reason"
+            label="Reason (optional)"
+            formControl={formHook}
+          />
+        </Stack>
+      ),
       confirmText:
-        'Suppress alerts for [standardLabel]? The tenant keeps counting as non-compliant, but alerts are muted.',
+        'Deny the deviation on [standardLabel]? The engine remediates it back to the baseline on the next run, regardless of the configured posture.',
       multiPost: false,
       relatedQueryKeys,
-      condition: (row) => row.deviationState === 'Detected',
+      condition: (row) =>
+        row.status === 'Drift' && !row.standardName.startsWith('ManualTask'),
     },
     {
-      label: 'Clear Deviation Status',
+      label: 'Clear Triage Status',
       type: 'POST',
       url: '/api/ExecUpdateBaselineDeviation',
       icon: <RemoveCircle />,
@@ -301,11 +451,12 @@ const Page = () => {
         standard: 'standardName',
       },
       confirmText:
-        'Clear the Accept/Suppress status on [standardLabel]? The deviation re-surfaces as Detected on the next run.',
+        'Clear the Accept/Deny status on [standardLabel]? The deviation re-surfaces as Drift on the next run.',
       multiPost: false,
       relatedQueryKeys,
       condition: (row) =>
-        ['Accepted', 'Suppressed'].includes(row.deviationState),
+        (row.status === 'Accepted' || row.status?.startsWith('Denied')) &&
+        !row.standardName.startsWith('ManualTask'),
     },
     {
       label: 'Mark Task Complete',
@@ -323,7 +474,7 @@ const Page = () => {
       multiPost: false,
       relatedQueryKeys,
       condition: (row) =>
-        row.standardName === 'ManualTask' && row.deviationState === 'Detected',
+        row.standardName === 'ManualTask' && row.status === 'Drift',
     },
     {
       label: 'Create Tenant Override',
@@ -331,6 +482,8 @@ const Page = () => {
       url: '/api/ExecBaselineOverride',
       icon: <Tune />,
       color: 'info',
+      // Overrides configure ONE tenant's settings in a dialog - meaningless as a bulk action.
+      hideBulk: true,
       data: {
         action: '!createOverride',
         tenantFilter: 'tenantFilter',
@@ -381,6 +534,7 @@ const Page = () => {
       url: '/api/ExecBaselineOverride',
       icon: <LayersClear />,
       color: 'error',
+      hideBulk: true,
       data: {
         action: '!deleteOverride',
         tenantFilter: 'tenantFilter',
@@ -454,10 +608,11 @@ const Page = () => {
         { label: 'Standard', value: row.standardLabel },
         {
           label: 'State',
-          value: row.deviationState,
-          color: deviationColors[row.deviationState],
+          value: row.status,
+          color: deviationColors[row.status],
         },
         { label: 'Impact', value: row.impact },
+        { label: 'Stage', value: row.stage },
         { label: 'Configured By', value: row.sourceTemplate },
         {
           label: 'Last Run',
@@ -465,7 +620,6 @@ const Page = () => {
             ? parseCippDate(row.lastRun).toLocaleString()
             : 'N/A',
         },
-        { label: 'Last Outcome', value: row.lastOutcome },
       ]
       if (row.deviationReason) {
         properties.push({
@@ -579,7 +733,7 @@ const Page = () => {
             >
               Expected vs Current
             </Typography>
-            {differences.length > 0 ? (
+            {row.currentValue ? (
               <>
                 {Object.keys(row.expectedValue ?? {}).map((key) => {
                   const drifted = differences.includes(key)
@@ -646,8 +800,17 @@ const Page = () => {
                         }}
                       >
                         Expected: {JSON.stringify(row.expectedValue[key])}
-                        {drifted &&
-                          ` - Current: ${JSON.stringify(row.currentValue?.[key])}`}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontFamily: 'monospace',
+                          display: 'block',
+                          wordBreak: 'break-word',
+                          color: drifted ? 'error.main' : 'text.secondary',
+                        }}
+                      >
+                        Current: {JSON.stringify(row.currentValue?.[key])}
                       </Typography>
                       {drifted && !acceptedPath && (
                         <Button
@@ -666,21 +829,20 @@ const Page = () => {
                     </Box>
                   )
                 })}
-                <Typography variant="caption" color="text.secondary">
-                  Accepting a single property tolerates only that value - drift
-                  on any other property still raises a deviation.
-                </Typography>
+                {differences.length > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    Accepting a single property tolerates only that value -
+                    drift on any other property still raises a deviation.
+                  </Typography>
+                )}
               </>
             ) : (
               <>
                 {jsonBox(row.expectedValue, true)}
-                {row.currentValue ? (
-                  jsonBox(row.currentValue, true)
-                ) : (
-                  <Typography variant="caption" color="text.secondary">
-                    No data has been collected for this standard yet.
-                  </Typography>
-                )}
+                <Typography variant="caption" color="text.secondary">
+                  No data has been collected for this standard yet - this is the
+                  configuration that will apply.
+                </Typography>
               </>
             )}
             <Typography
@@ -732,17 +894,11 @@ const Page = () => {
                   color="text.secondary"
                   sx={{ display: 'block', mt: 0.5 }}
                 >
-                  {run.mode} run, triggered by {run.triggeredBy}
+                  {runModeLabels[run.mode] ?? run.mode}, triggered by{' '}
+                  {run.triggeredBy}
                   {run.remediated ? ', remediated' : ''}
                 </Typography>
-                {run.diff && (
-                  <Typography
-                    variant="caption"
-                    sx={{ fontFamily: 'monospace', display: 'block', mt: 0.5 }}
-                  >
-                    {JSON.stringify(run.diff)}
-                  </Typography>
-                )}
+                <RunDetails diff={run.diff} />
               </Box>
             ))}
           </Stack>
@@ -761,8 +917,14 @@ const Page = () => {
           { label: 'Standard', value: row.standardLabel },
           { label: 'Category', value: row.category },
           { label: 'Impact', value: row.impact },
-          { label: 'Aligned', value: `${row.alignedPercentage}%` },
-          { label: 'Verified', value: `${row.verifiedPercentage}%` },
+          {
+            label: 'Compliant with accepted deviations',
+            value: `${row.alignedPercentage}%`,
+          },
+          {
+            label: 'Compliant with baseline',
+            value: `${row.verifiedPercentage}%`,
+          },
           { label: 'Accepted Deviations', value: row.accepted },
           { label: 'License Missing', value: row.licenseMissing },
           {
@@ -820,9 +982,9 @@ const Page = () => {
                 </Box>
                 <Chip
                   variant="outlined"
-                  label={tenantRow.deviationState}
+                  label={tenantRow.status}
                   size="small"
-                  color={deviationColors[tenantRow.deviationState] ?? 'default'}
+                  color={deviationColors[tenantRow.status] ?? 'default'}
                 />
               </Stack>
               {tenantRow.deviationReason && (
@@ -834,11 +996,13 @@ const Page = () => {
                   {tenantRow.deviationReason}
                 </Typography>
               )}
-              {(['Detected', 'Suppressed'].includes(tenantRow.deviationState) ||
+              {(['Drift', 'Denied - Remediate Pending'].includes(
+                tenantRow.status
+              ) ||
                 tenantRow.sourceTemplate === 'Tenant Override') && (
                 <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                  {['Detected', 'Suppressed'].includes(
-                    tenantRow.deviationState
+                  {['Drift', 'Denied - Remediate Pending'].includes(
+                    tenantRow.status
                   ) && (
                     <>
                       <Button
@@ -905,8 +1069,19 @@ const Page = () => {
       icon: <PlayArrow />,
       color: 'info',
       data: { mode: '!run', templateId: 'GUID' },
+      children: ({ formHook, row }) => (
+        <Stack spacing={2} sx={{ mt: 2 }}>
+          <CippFormTemplateTenantSelector
+            formControl={formHook}
+            templateTenants={asOptionArray(row.assignments)}
+            excludedTenants={asOptionArray(
+              row.exclusions ?? row.excludedTenants
+            )}
+          />
+        </Stack>
+      ),
       confirmText:
-        'Force a run of [templateName] against its assigned tenants? Standards in report-only stages are compared without changes.',
+        'Run [templateName] now? Pick a single covered tenant, or All Tenants in Template for the whole assignment. Standards in report-only stages are compared without changes.',
       multiPost: false,
       relatedQueryKeys,
     },
@@ -1038,22 +1213,22 @@ const Page = () => {
   const tenantFilterList = [
     {
       filterName: 'Open Deviations',
-      value: [{ id: 'deviationState', value: 'Detected' }],
+      value: [{ id: 'status', value: 'Drift' }],
       type: 'column',
     },
     {
       filterName: 'Accepted',
-      value: [{ id: 'deviationState', value: 'Accepted' }],
+      value: [{ id: 'status', value: 'Accepted' }],
       type: 'column',
     },
     {
-      filterName: 'Suppressed',
-      value: [{ id: 'deviationState', value: 'Suppressed' }],
+      filterName: 'Denied',
+      value: [{ id: 'status', value: 'Denied - Remediate Pending' }],
       type: 'column',
     },
     {
       filterName: 'License Missing',
-      value: [{ id: 'deviationState', value: 'License Missing' }],
+      value: [{ id: 'status', value: 'Skipped - No License' }],
       type: 'column',
     },
   ]
@@ -1061,7 +1236,7 @@ const Page = () => {
   const standardFilterList = [
     {
       filterName: 'Has Open Deviations',
-      value: [{ id: 'detected', value: 1 }],
+      value: [{ id: 'drift', value: 1 }],
       type: 'column',
     },
     {
@@ -1123,6 +1298,17 @@ const Page = () => {
               style={{ width: 16, height: 16, marginRight: 6 }}
             />
             Baseline View
+          </Box>
+        </Tooltip>
+      </ToggleButton>
+      <ToggleButton value="history" aria-label="historic view">
+        <Tooltip
+          title="Every recorded run event for the selected tenant"
+          placement="top"
+        >
+          <Box sx={{ display: 'inline-flex', alignItems: 'center' }}>
+            <ClockIcon style={{ width: 16, height: 16, marginRight: 6 }} />
+            Historic View
           </Box>
         </Tooltip>
       </ToggleButton>
@@ -1246,20 +1432,20 @@ const Page = () => {
       data={[
         {
           icon: <CheckBadgeIcon />,
-          name: 'Aligned',
+          name: 'Compliant with accepted deviations',
           data: `${tenant.alignedPercentage}%`,
           color: 'success',
           toolTip: `${tenant.acceptedPercentage}% of this score comes from accepted deviations`,
         },
         {
           icon: <ShieldCheckIcon />,
-          name: 'Verified Compliant',
+          name: 'Compliant with baseline',
           data: `${tenant.verifiedPercentage}%`,
         },
         {
           icon: <ExclamationTriangleIcon />,
           name: 'Open Deviations',
-          data: tenant.detected,
+          data: tenant.drift,
           color: 'error',
         },
         {
@@ -1414,6 +1600,242 @@ const Page = () => {
     </>
   )
 
+  // Historic view: the tenant's run events on an activity timeline (same pattern as the
+  // manage-tenant history page). Each event carries its run GUID; View Logs opens the
+  // Baselines log drawer filtered to exactly that run's entries.
+  if (viewMode === 'history') {
+    const historyEvents = historyApi.data?.events ?? []
+    return (
+      <>
+        <CippHead title={pageTitle} />
+        <Container maxWidth={false}>
+          <Stack spacing={2}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              {modeToggle}
+              <CippApiLogsDrawer
+                apiFilter="Baselines"
+                buttonText="View Logs"
+                title="Baseline Logs"
+                tenantFilter={currentTenant}
+                variant="outlined"
+              />
+            </Stack>
+            <Typography variant="body1" color="text.secondary">
+              This timeline shows every recorded baseline run event for{' '}
+              {tenant.displayName}.
+            </Typography>
+            {historyApi.isFetching && (
+              <Box display="flex" justifyContent="center" py={4}>
+                <CircularProgress />
+              </Box>
+            )}
+            {!historyApi.isFetching && historyEvents.length === 0 && (
+              <Alert severity="info">
+                No baseline run history for this tenant yet - run a baseline
+                first.
+              </Alert>
+            )}
+            {historyEvents.length > 0 && (
+              <Card sx={{ mr: 2 }}>
+                <CardContent>
+                  <Timeline
+                    sx={{
+                      [`& .MuiTimelineOppositeContent-root`]: {
+                        flex: 0.2,
+                        minWidth: 100,
+                      },
+                      [`& .MuiTimelineContent-root`]: { flex: 0.8 },
+                    }}
+                  >
+                    {historyEvents.map((event, index) => {
+                      const timelineConfig = outcomeTimeline[event.outcome] ?? {
+                        color: 'grey',
+                        chipColor: 'default',
+                        icon: <InfoOutlined />,
+                      }
+                      const eventDate = parseCippDate(event.timestamp)
+                      const isExpanded = expandedEvents.has(index)
+                      const diffEntries = event.diff
+                        ? Array.isArray(event.diff)
+                          ? event.diff
+                          : [event.diff]
+                        : []
+                      return (
+                        <TimelineItem key={`${event.runId}-${index}`}>
+                          <TimelineOppositeContent
+                            sx={{ m: 'auto 0', minWidth: 100, maxWidth: 100 }}
+                            align="right"
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              fontSize="0.7rem"
+                            >
+                              {eventDate.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              fontWeight="bold"
+                              fontSize="0.75rem"
+                            >
+                              {eventDate.toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                              })}
+                            </Typography>
+                          </TimelineOppositeContent>
+                          <TimelineSeparator>
+                            <TimelineDot
+                              color={timelineConfig.color}
+                              variant="outlined"
+                              size="small"
+                            >
+                              {timelineConfig.icon}
+                            </TimelineDot>
+                            {index < historyEvents.length - 1 && (
+                              <TimelineConnector />
+                            )}
+                          </TimelineSeparator>
+                          <TimelineContent sx={{ py: '8px', px: 2 }}>
+                            <Stack spacing={1}>
+                              <Box
+                                display="flex"
+                                alignItems="center"
+                                gap={1}
+                                flexWrap="wrap"
+                              >
+                                <Chip
+                                  label={event.outcome}
+                                  color={timelineConfig.chipColor}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem', height: 20 }}
+                                />
+                                <Chip
+                                  label={
+                                    runModeLabels[event.mode] ?? event.mode
+                                  }
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ fontSize: '0.7rem', height: 20 }}
+                                />
+                                <Tooltip title={event.runId}>
+                                  <Chip
+                                    label={`Run ${String(event.runId).slice(0, 8)}`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ fontSize: '0.7rem', height: 20 }}
+                                  />
+                                </Tooltip>
+                              </Box>
+                              <Box>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight="medium"
+                                  sx={{ fontSize: '0.875rem' }}
+                                >
+                                  {historyEventMessage(event)}
+                                </Typography>
+                                <Box
+                                  display="flex"
+                                  alignItems="center"
+                                  gap={2}
+                                  sx={{ mt: 0.5 }}
+                                >
+                                  <Link
+                                    component="button"
+                                    variant="caption"
+                                    onClick={() => toggleEventExpansion(index)}
+                                    sx={{
+                                      textAlign: 'left',
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    {isExpanded
+                                      ? 'Hide details'
+                                      : 'View details'}
+                                  </Link>
+                                  <CippApiLogsDrawer
+                                    baselineRunFilter={event.runId}
+                                    tenantFilter={currentTenant}
+                                    buttonText="View Logs"
+                                    title={`Run ${String(event.runId).slice(0, 8)} - Logs`}
+                                    size="small"
+                                    sx={{
+                                      fontSize: '0.75rem',
+                                      p: 0,
+                                      minWidth: 0,
+                                      textTransform: 'none',
+                                    }}
+                                  />
+                                </Box>
+                                {isExpanded && (
+                                  <Box sx={{ mt: 0.5 }}>
+                                    {diffEntries.map((entry, diffIndex) => (
+                                      <Typography
+                                        key={entry?.Property ?? diffIndex}
+                                        variant="caption"
+                                        sx={{
+                                          fontFamily: 'monospace',
+                                          display: 'block',
+                                          wordBreak: 'break-word',
+                                        }}
+                                      >
+                                        {entry?.Property}: expected{' '}
+                                        {JSON.stringify(entry?.ExpectedValue)},
+                                        found{' '}
+                                        {JSON.stringify(entry?.ReceivedValue)}
+                                      </Typography>
+                                    ))}
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontFamily: 'monospace',
+                                        display: 'block',
+                                        wordBreak: 'break-word',
+                                        color: 'text.secondary',
+                                      }}
+                                    >
+                                      Run ID: {event.runId}
+                                    </Typography>
+                                  </Box>
+                                )}
+                              </Box>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: '0.7rem' }}
+                              >
+                                Triggered by {event.triggeredBy}
+                              </Typography>
+                            </Stack>
+                          </TimelineContent>
+                        </TimelineItem>
+                      )
+                    })}
+                  </Timeline>
+                </CardContent>
+              </Card>
+            )}
+            {dialogs}
+          </Stack>
+        </Container>
+      </>
+    )
+  }
+
   // Tenant view: custom layout so the deviation feed sits directly next to the
   // alignment table.
   if (isTenantView) {
@@ -1449,12 +1871,13 @@ const Page = () => {
               simpleColumns={[
                 'standardLabel',
                 'category',
-                'deviationState',
+                'stage',
+                'status',
                 'deviationReason',
                 'deviationBy',
                 'deviationAt',
+                'deviationExpires',
                 'sourceTemplate',
-                'lastOutcome',
                 'lastRun',
               ]}
             />
@@ -1505,7 +1928,7 @@ const Page = () => {
               'alignedPercentage',
               'verifiedPercentage',
               'accepted',
-              'detected',
+              'drift',
               'licenseMissing',
               'totalTenants',
             ]
