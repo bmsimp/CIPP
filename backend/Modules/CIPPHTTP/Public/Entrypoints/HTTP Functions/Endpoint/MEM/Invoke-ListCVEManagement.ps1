@@ -4,17 +4,19 @@ function Invoke-ListCVEManagement {
         Entrypoint,AnyTenant
     .ROLE
         Endpoint.Security.Read
+    .DESCRIPTION
+        Lists CVEs affecting a tenant's devices, from Defender threat and vulnerability management, along with any exceptions recorded in CIPP. AllTenants and UseReportDB=true read the cached report database instead of Defender directly, because the live path can only query one tenant per request.
     #>
 
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
     # Interact with query parameters or the body of the request.
     $TenantFilter = $Request.Query.tenantFilter
-    $UseReportDB = $Request.Query.UseReportDB
-
+    # Serve from the reporting database cache instead of live Graph. Much faster, especially for AllTenants.
+    $UseReportDB = $Request.Query.UseReportDB -eq $true
     # AllTenants always uses the reporting database - the live path queries a single tenant's
     # Defender TVM API and cannot fan out across tenants within one request.
-    if ($UseReportDB -eq 'true' -or $TenantFilter -eq 'AllTenants') {
+    if ($UseReportDB -or $TenantFilter -eq 'AllTenants') {
         try {
             $GraphRequest = Get-CIPPCVEReport -TenantFilter $TenantFilter -ErrorAction Stop
             $StatusCode = [HttpStatusCode]::OK
