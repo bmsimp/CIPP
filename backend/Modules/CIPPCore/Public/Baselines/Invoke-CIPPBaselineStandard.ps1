@@ -10,7 +10,8 @@ function Invoke-CIPPBaselineStandard {
         1. manual definitions track operator completion on the resolved row (reopen on the
            configured recurrence); custom definitions delegate to their own
            Invoke-CIPPBaseline<StandardName> script.
-        2. Read the current value from the CIPPDb cache (cacheType -> filter[] -> object
+        2. Read the current value from the CIPPDb cache (cacheType -> optional array
+           dot-path descend/flatten -> filter[] (properties may be dot-paths) -> object
            dot-path). On a cache miss the engine triggers the central collector for that
            cacheType and re-reads once; if there is still nothing, NOTHING is written - the
            row stays 'No Data' and retries naturally on the next run.
@@ -112,19 +113,51 @@ function Invoke-CIPPBaselineStandard {
         $ResolvedTable = Get-CippTable -tablename 'BaselineAlignment'
         $SafeTenant = ConvertTo-CIPPODataFilterValue -Value $TenantFilter
         $SafeStandard = ConvertTo-CIPPODataFilterValue -Value $Item.Standard
+        # $anyOf: an expected property may declare several acceptable values, e.g.
+        # { "$anyOf": ["migrationComplete", null] } - null and 'migrationComplete' both
+        # mean the auth-policy migration is done. Resolved here so Compare-CIPPIntuneObject
+        # stays untouched: with -UseCurrent, a current value inside the set resolves to
+        # itself (the compare sees a match); everywhere the value is displayed or deployed,
+        # the first non-null entry is the canonical expected value. %var% tokens render
+        # inside the set like anywhere else. Sets nest inside objects, not inside arrays.
+        $ResolveAnyOf = {
+            param($Node, $Current, $UseCurrent)
+            if ($Node -is [System.Collections.IDictionary]) { $Node = [PSCustomObject]$Node }
+            if ($Node -isnot [System.Management.Automation.PSCustomObject]) { return $Node }
+            $Names = @($Node.PSObject.Properties.Name)
+            if ($Names.Count -eq 1 -and $Names[0] -eq '$anyOf') {
+                $Allowed = @($Node.'$anyOf')
+                # Membership is HARD: an empty current value (null/''/[]) only matches an
+                # explicit null member, and a boolean member only matches a real boolean.
+                $IsMember = @($Allowed | Where-Object {
+                        if ($null -eq $Current -or ('' -eq "$Current" -and $Current -isnot [bool])) { $null -eq $_ }
+                        elseif ($_ -is [bool]) { $Current -is [bool] -and $_ -eq $Current }
+                        else { $null -ne $_ -and $_ -eq $Current }
+                    }).Count -gt 0
+                if ($UseCurrent -and $IsMember) { return $Current }
+                return ($Allowed | Where-Object { $null -ne $_ } | Select-Object -First 1)
+            }
+            $Resolved = [PSCustomObject]@{}
+            foreach ($Property in $Node.PSObject.Properties) {
+                $Resolved | Add-Member -NotePropertyName $Property.Name -NotePropertyValue (& $ResolveAnyOf $Property.Value $Current.$($Property.Name) $UseCurrent)
+            }
+            $Resolved
+        }
+
         $Prior = Get-CIPPAzDataTableEntity @ResolvedTable -Filter "PartitionKey eq '$SafeTenant' and StandardName eq '$SafeStandard'" | Select-Object -First 1
         $PriorStatus = $Prior.Status
         # Per-property acceptances (design addendum): parsed up front because they shape the
         # compare, the remediation gate, and the resulting status.
         $AcceptedPaths = $(try { $Prior.AcceptedPaths | ConvertFrom-Json } catch { $null })
         $AcceptedKeys = @($AcceptedPaths.PSObject.Properties.Name | Where-Object { $_ })
-        $Expected = & $Render $Definition.expected $Item.Variables
+        $ExpectedTemplate = & $Render $Definition.expected $Item.Variables
+        $Expected = & $ResolveAnyOf $ExpectedTemplate $null $false
         $Tiers = foreach ($Tier in @($Item.Tiers)) {
             if (-not $Tier) { continue }
             [PSCustomObject]@{
                 templateName = $Tier.templateName
                 assignedTo   = $Tier.assignedTo
-                value        = (& $Render $Definition.expected $Tier.variables)
+                value        = (& $ResolveAnyOf (& $Render $Definition.expected $Tier.variables) $null $false)
                 effective    = [bool]$Tier.effective
             }
         }
@@ -142,6 +175,15 @@ function Invoke-CIPPBaselineStandard {
             Remediated          = $false
             Outcome             = 'Error'
             Diff                = $null
+            # RowDiff = the PRE-acceptance per-property deviations, persisted on the
+            # resolved row so the frontend renders the ENGINE's verdict per property -
+            # it never re-derives compares (single source of truth). Accepted-path
+            # tolerated properties stay listed; the UI dims them via acceptedPaths.
+            RowDiff             = @()
+            # The rendered manual block (taskName/instructions/documentationUrl/reopen)
+            # persists on the resolved row so the offcanvas can show the operator what
+            # to actually do.
+            Manual              = $null
             Inheritance         = @($Tiers)
             AlertEvent          = $null
             CacheType           = $Definition.read.cacheType
@@ -150,6 +192,7 @@ function Invoke-CIPPBaselineStandard {
         # 1b. Manual tasks: state lives on the resolved row; the operator completes them.
         if ($Definition.manual) {
             $Manual = & $Render $Definition.manual $Item.Variables
+            $Result.Manual = $Manual
             $Completed = [bool]($(try { $Prior.CurrentValue | ConvertFrom-Json } catch { $null })?.completed)
             $LastDone = if ("$($Prior.LastRemediated)" -match '^\d+$') { [int64]$Prior.LastRemediated } else { 0 }
             $ReopenSeconds = switch ($Manual.reopen) {
@@ -163,6 +206,9 @@ function Invoke-CIPPBaselineStandard {
             }
             $Result.CurrentValue = [PSCustomObject]@{ completed = $Completed }
             $Result.Compliant = $Completed
+            if (-not $Completed) {
+                $Result.RowDiff = @([PSCustomObject]@{ Property = 'completed'; ExpectedValue = $true; ReceivedValue = $false })
+            }
             $Result.Outcome = if ($Completed) { 'Compliant' } else { 'Drift' }
             $Result.Status = if ($Completed) { 'Compliant' } elseif ($PriorStatus -eq 'Accepted') { 'Accepted' } else { 'Drift' }
             if ($Result.Status -eq 'Drift' -and $PriorStatus -ne 'Drift' -and $Item.AlertEnabled) {
@@ -178,16 +224,30 @@ function Invoke-CIPPBaselineStandard {
         # pass instead of skipping forever.
         $ReadCurrent = {
             $Data = @(New-CIPPDbRequest -TenantFilter $TenantFilter -Type $Definition.read.cacheType | Where-Object { $_ })
+            # read.array (a dot-path) descends into each cached row's nested array and
+            # flattens the elements into the candidate set BEFORE the filters run, so a
+            # definition can select e.g. one entry of authenticationMethodConfigurations
+            # declaratively.
+            if ($Definition.read.array) {
+                $Data = @($Data | ForEach-Object {
+                        $Nested = $_
+                        foreach ($Segment in ($Definition.read.array -split '\.')) { $Nested = $Nested.$Segment }
+                        $Nested
+                    } | Where-Object { $_ })
+            }
             foreach ($Condition in @($Definition.read.filter)) {
                 if (-not $Condition) { continue }
                 $Match = & $Render $Condition.value $Item.Variables
                 $Property = $Condition.property
                 $Data = @($Data | Where-Object {
+                        # filter.property may itself be a dot-path into the candidate.
+                        $Candidate = $_
+                        foreach ($Segment in ($Property -split '\.')) { $Candidate = $Candidate.$Segment }
                         switch ($Condition.operator) {
-                            'ne' { $_.$Property -ne $Match }
-                            'startsWith' { "$($_.$Property)".StartsWith("$Match") }
-                            'notStartsWith' { -not "$($_.$Property)".StartsWith("$Match") }
-                            default { $_.$Property -eq $Match }
+                            'ne' { $Candidate -ne $Match }
+                            'startsWith' { "$Candidate".StartsWith("$Match") }
+                            'notStartsWith' { -not "$Candidate".StartsWith("$Match") }
+                            default { $Candidate -eq $Match }
                         }
                     })
             }
@@ -229,8 +289,43 @@ function Invoke-CIPPBaselineStandard {
                 $Projected | Add-Member -NotePropertyName $Property -NotePropertyValue $Current.$Property
             }
             $Result.CurrentValue = $Projected
+            # The compare copy of expected resolves $anyOf against the CURRENT value: a
+            # member of the set compares equal, a non-member diffs against the canonical.
+            $CompareExpected = & $ResolveAnyOf $ExpectedTemplate $Current $true
             # Compare-CIPPIntuneObject emits $null (not an empty set) when nothing differs.
-            $Differences = @(Compare-CIPPIntuneObject -ReferenceObject $Expected -DifferenceObject $Projected | Where-Object { $_ })
+            $Differences = @(Compare-CIPPIntuneObject -ReferenceObject $CompareExpected -DifferenceObject $Projected | Where-Object { $_ })
+
+            # Hard compares: the shared compare treats false/0/null/''/[] as interchangeable
+            # empties, which would let 'not configured' satisfy an explicit false/0
+            # expectation. The shared function stays untouched (CA/Intune depend on its
+            # semantics) - this only ADDS the diffs the engine's stricter reading requires:
+            # an expected boolean or number against an empty current value is drift.
+            $AddHardGaps = $null
+            $AddHardGaps = {
+                param($ExpectedNode, $CurrentNode, $Prefix, $Gaps)
+                foreach ($ExpectedProperty in ($ExpectedNode ?? [PSCustomObject]@{}).PSObject.Properties) {
+                    $Path = if ($Prefix) { '{0}.{1}' -f $Prefix, $ExpectedProperty.Name } else { $ExpectedProperty.Name }
+                    $ExpectedLeaf = $ExpectedProperty.Value
+                    $CurrentLeaf = if ($null -ne $CurrentNode) { $CurrentNode.$($ExpectedProperty.Name) } else { $null }
+                    if ($ExpectedLeaf -is [System.Management.Automation.PSCustomObject]) {
+                        & $AddHardGaps $ExpectedLeaf $CurrentLeaf $Path $Gaps
+                    } elseif ($ExpectedLeaf -is [bool] -or $ExpectedLeaf -is [int] -or $ExpectedLeaf -is [int64] -or $ExpectedLeaf -is [double] -or $ExpectedLeaf -is [decimal]) {
+                        if ($null -eq $CurrentLeaf -or ('' -eq "$CurrentLeaf" -and $CurrentLeaf -isnot [bool])) {
+                            $Gaps.Add([PSCustomObject]@{ Property = $Path; ExpectedValue = $ExpectedLeaf; ReceivedValue = $CurrentLeaf })
+                        }
+                    }
+                }
+            }
+            $HardGaps = [System.Collections.Generic.List[object]]::new()
+            & $AddHardGaps $CompareExpected $Projected '' $HardGaps
+            if ($HardGaps.Count -gt 0) {
+                $Merged = [System.Collections.Generic.List[object]]::new()
+                foreach ($Difference in $Differences) { $Merged.Add($Difference) }
+                foreach ($Gap in $HardGaps) {
+                    if (@($Differences | Where-Object { $_.Property -eq $Gap.Property }).Count -eq 0) { $Merged.Add($Gap) }
+                }
+                $Differences = @($Merged)
+            }
 
             # An accepted path tolerates that property's drift - and only that property's.
             # Prefix matches cover nested paths.
@@ -242,6 +337,7 @@ function Invoke-CIPPBaselineStandard {
                     })
             }
             $Result.Diff = $Differences
+            $Result.RowDiff = $PreFilterDifferences
         }
         $Compliant = ($null -ne $Current) -and ($Differences.Count -eq 0)
         # True when accepted paths actually swallowed drift this run - the row's alignment
@@ -312,6 +408,7 @@ function Invoke-CIPPBaselineStandard {
             # Optimistic post-write: currentValue = what we wrote; the next run's cache read verifies.
             $Result.CurrentValue = $Expected
             $Result.Compliant = $true
+            $Result.RowDiff = @()
             $Result.PendingVerification = $true
             $Result.Remediated = $true
             $Result.Outcome = 'Remediated'
