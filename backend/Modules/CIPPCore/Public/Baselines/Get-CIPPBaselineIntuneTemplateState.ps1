@@ -114,6 +114,24 @@ function Get-CIPPBaselineIntuneTemplateState {
             }
             $Policy = $Projection
         }
+        # Custom (OMA-URI) policies: templates carry values as strings ('true') while
+        # Graph returns typed values (true) - a type difference the shared compare
+        # correctly flags but nobody means. Coerce value to string on BOTH sides, drop
+        # Graph's decoration (isEncrypted/secretReferenceValueId/empty description) and
+        # sort by omaUri so ordering never drifts. The collector decrypts encrypted
+        # values at cache time, so value holds the comparable plaintext.
+        if ($Policy.PSObject.Properties['omaSettings'] -and $Policy.omaSettings) {
+            $Policy.omaSettings = @($(foreach ($OmaSetting in $Policy.omaSettings) {
+                        $Clean = [PSCustomObject]@{
+                            '@odata.type' = $OmaSetting.'@odata.type'
+                            displayName   = "$($OmaSetting.displayName)"
+                            omaUri        = "$($OmaSetting.omaUri)"
+                            value         = "$($OmaSetting.value)"
+                        }
+                        if ("$($OmaSetting.description)") { $Clean | Add-Member -NotePropertyName description -NotePropertyValue "$($OmaSetting.description)" }
+                        $Clean
+                    }) | Sort-Object -Property omaUri)
+        }
         $Policy
     }
 
@@ -140,10 +158,15 @@ function Get-CIPPBaselineIntuneTemplateState {
         foreach ($CacheType in $Family.Caches) {
             $CacheMeta = $(try { Get-CIPPDbItem -TenantFilter $TenantFilter -Type $CacheType -CountsOnly } catch { $null })
             if ($null -ne $CacheMeta) {
+                # EmptyFamily: the WHOLE family came back empty, not just this policy.
+                # The engine cross-checks against the prior state - a family that held
+                # this policy recently going completely empty is more likely a failed
+                # or flaky collection than a mass deletion.
                 return @{
                     Expected    = $Expected
                     Current     = [PSCustomObject]@{ policyStatus = 'Policy is missing from this tenant' }
                     CompareType = $null
+                    EmptyFamily = $true
                 }
             }
         }
@@ -182,6 +205,7 @@ function Get-CIPPBaselineIntuneTemplateState {
     # An unknown result ($null, e.g. Graph error) counts as not-assigned, like V2.
     # Note remediation ASSIGNS in append mode - an extra portal-added assignment reports
     # as drift here but is never removed automatically.
+    $StrictCompare = $null
     if ((& $Unwrap $Variables.verifyAssignments) -eq $true) {
         $Expected | Add-Member -NotePropertyName 'isAssigned' -NotePropertyValue $true -Force
         $AssignTo = "$(& $Unwrap $Variables.assignTo)"
@@ -189,7 +213,11 @@ function Get-CIPPBaselineIntuneTemplateState {
         if ($CustomGroup) { $AssignTo = 'customGroup' }
         $AssignmentsMatch = Compare-CIPPIntuneAssignments -ExistingAssignments @($Live.assignments) -ExpectedAssignTo $AssignTo -ExpectedCustomGroup $CustomGroup -ExpectedExcludeGroup "$(& $Unwrap $Variables.excludeGroup)" -ExpectedAssignmentFilter "$(& $Unwrap $Variables.assignmentFilter)" -ExpectedAssignmentFilterType "$(& $Unwrap $Variables.assignmentFilterType)" -TenantFilter $TenantFilter
         $Current | Add-Member -NotePropertyName 'isAssigned' -NotePropertyValue ([bool]$AssignmentsMatch) -Force
+        # The Catalog flatten compares ONLY the settings arrays - top-level properties
+        # like isAssigned never reach it. StrictCompare makes the engine diff these
+        # explicitly, regardless of the family's compare type.
+        $StrictCompare = @('isAssigned')
     }
 
-    return @{ Expected = $Expected; Current = $Current; CompareType = $Family.CompareType }
+    return @{ Expected = $Expected; Current = $Current; CompareType = $Family.CompareType; StrictCompare = $StrictCompare }
 }

@@ -52,6 +52,7 @@ import {
   RemoveCircle,
   TaskAlt,
   Tune,
+  Visibility,
   WarningAmberOutlined,
 } from '@mui/icons-material'
 import { Layout as DashboardLayout } from '../../../../layouts/index.js'
@@ -77,6 +78,8 @@ import { useDialog } from '../../../../hooks/use-dialog'
 import { useSettings } from '../../../../hooks/use-settings'
 import { ApiGetCall } from '../../../../api/ApiCall'
 import { parseCippDate } from '../../../../utils/parse-cipp-date'
+import { CippOffCanvas } from '../../../../components/CippComponents/CippOffCanvas'
+import CippJsonView from '../../../../components/CippFormPages/CippJSONView'
 
 const deviationColors = {
   Compliant: 'success',
@@ -88,6 +91,80 @@ const deviationColors = {
   'Denied - Delete Pending': 'warning',
   'Skipped - No License': 'default',
   'No Data': 'default',
+}
+
+// Identity-carrying tiers (CA/Intune templates): the tier configures a full policy
+// template, so the card shows a View Policy button that opens the template in the
+// same policy viewer the editor's picker preview uses - a raw variables blob means
+// nothing to an operator.
+const templatePolicySources = {
+  intuneTemplate: {
+    title: 'Intune Template',
+    url: '/api/ListIntuneTemplates',
+    queryKey: 'ListIntuneTemplates',
+    property: 'RAWJson',
+    type: 'intune',
+  },
+  caTemplate: {
+    title: 'Conditional Access Policy',
+    url: '/api/ListCATemplates',
+    queryKey: 'ListCATemplates',
+    type: 'default',
+  },
+}
+
+const TierPolicyView = ({ variableKey, templateRef }) => {
+  const [visible, setVisible] = useState(false)
+  const source = templatePolicySources[variableKey]
+  const templatesApi = ApiGetCall({
+    url: source.url,
+    queryKey: source.queryKey,
+    waiting: visible,
+  })
+  const rawRef =
+    templateRef && typeof templateRef === 'object'
+      ? templateRef.value
+      : templateRef
+  const entry = (templatesApi.data ?? []).find(
+    (template) => template.GUID === rawRef
+  )
+  let policy = entry ?? null
+  if (entry && source.property) {
+    try {
+      policy = JSON.parse(entry[source.property])
+    } catch {
+      policy = entry
+    }
+  }
+  return (
+    <>
+      <Button
+        size="small"
+        variant="outlined"
+        startIcon={<Visibility />}
+        onClick={() => setVisible(true)}
+      >
+        View Policy
+      </Button>
+      <CippOffCanvas
+        visible={visible}
+        onClose={() => setVisible(false)}
+        title={source.title}
+        size="xl"
+      >
+        {templatesApi.isFetching ? (
+          <CircularProgress size={24} />
+        ) : policy ? (
+          <CippJsonView object={policy} defaultOpen={true} type={source.type} />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            The template could not be found - it may have been deleted from the
+            template library.
+          </Typography>
+        )}
+      </CippOffCanvas>
+    </>
+  )
 }
 
 const propertyList = (properties) => (
@@ -713,6 +790,11 @@ const Page = () => {
           )
       )
       const differences = cardPaths.filter(hasDiffAt)
+      // Drift first: the whole point of opening the offcanvas is seeing what's wrong -
+      // deviating cards render before compliant ones (stable within each group).
+      const orderedCardPaths = [...cardPaths].sort(
+        (a, b) => Number(hasDiffAt(b)) - Number(hasDiffAt(a))
+      )
       // Settings-catalog diffs key on friendly setting LABELS, not object paths - any
       // diff entry that maps to no expected-value path renders as its own card, valued
       // straight from the engine's diff.
@@ -766,6 +848,14 @@ const Page = () => {
         <Stack spacing={0}>
           {propertyList(properties)}
           <Stack spacing={2} sx={{ p: 2 }}>
+            {row.status === 'Conflict' && (
+              <Alert severity="error">
+                Two baselines configure this standard at the same assignment
+                level with different settings, so CIPP cannot know which one is
+                intended - nothing is compared or fixed until you edit one of
+                the baselines below.
+              </Alert>
+            )}
             <Typography
               variant="caption"
               sx={{
@@ -810,17 +900,88 @@ const Page = () => {
                     <Chip size="small" color="primary" label="Effective" />
                   )}
                 </Stack>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontFamily: 'monospace',
-                    display: 'block',
-                    mt: 0.5,
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {JSON.stringify(tier.value)}
-                </Typography>
+                {tier.remediateEnabled !== undefined && (
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    flexWrap="wrap"
+                    useFlexGap
+                    sx={{ mt: 1 }}
+                  >
+                    <Tooltip
+                      title={
+                        tier.remediateEnabled
+                          ? 'Drift is corrected automatically on every run'
+                          : 'Drift is only reported, never corrected automatically'
+                      }
+                    >
+                      <Chip
+                        variant="outlined"
+                        size="small"
+                        color={tier.remediateEnabled ? 'success' : 'default'}
+                        label={
+                          tier.remediateEnabled
+                            ? 'Auto-remediate'
+                            : 'Report only'
+                        }
+                      />
+                    </Tooltip>
+                    <Tooltip
+                      title={
+                        tier.alertEnabled
+                          ? 'An alert fires when a new deviation is detected'
+                          : 'No alerts fire for deviations on this standard'
+                      }
+                    >
+                      <Chip
+                        variant="outlined"
+                        size="small"
+                        color={tier.alertEnabled ? 'info' : 'warning'}
+                        label={
+                          tier.alertEnabled
+                            ? 'Alert on deviation'
+                            : 'Alerts muted'
+                        }
+                      />
+                    </Tooltip>
+                    {tier.alertOnRemediate && (
+                      <Tooltip title="An alert fires whenever auto-remediation corrects this standard">
+                        <Chip
+                          variant="outlined"
+                          size="small"
+                          color="info"
+                          label="Alert on remediation"
+                        />
+                      </Tooltip>
+                    )}
+                  </Stack>
+                )}
+                {tier.value?.intuneTemplate || tier.value?.caTemplate ? (
+                  <Box sx={{ mt: 1 }}>
+                    <TierPolicyView
+                      variableKey={
+                        tier.value?.intuneTemplate
+                          ? 'intuneTemplate'
+                          : 'caTemplate'
+                      }
+                      templateRef={
+                        tier.value?.intuneTemplate ?? tier.value?.caTemplate
+                      }
+                    />
+                  </Box>
+                ) : (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontFamily: 'monospace',
+                      display: 'block',
+                      mt: 0.5,
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {JSON.stringify(tier.value)}
+                  </Typography>
+                )}
                 {tier.effective && tier.templateName === 'Tenant Override' && (
                   <Button
                     size="small"
@@ -842,73 +1003,6 @@ const Page = () => {
               When multiple baselines configure the same standard, the baseline
               with the most specific assignment wins.
             </Typography>
-            {row.status === 'Conflict' && (
-              <Alert severity="error">
-                Two baselines configure this standard at the same assignment
-                level with different settings, so CIPP cannot know which one is
-                intended - nothing is compared or fixed until you edit one of
-                the baselines below.
-              </Alert>
-            )}
-            {(row.manual?.taskName || row.manual?.instructions) && (
-              <>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 600,
-                    color: 'text.secondary',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Manual Task
-                </Typography>
-                <Box
-                  sx={{
-                    p: 1.5,
-                    borderRadius: '12px',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper',
-                  }}
-                >
-                  {row.manual.taskName && (
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      {row.manual.taskName}
-                    </Typography>
-                  )}
-                  {row.manual.instructions && (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}
-                    >
-                      {row.manual.instructions}
-                    </Typography>
-                  )}
-                  {row.manual.documentationUrl && (
-                    <Link
-                      href={row.manual.documentationUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      variant="caption"
-                      sx={{ display: 'inline-block', mt: 1 }}
-                    >
-                      Open documentation
-                    </Link>
-                  )}
-                  {row.manual.reopen && row.manual.reopen !== 'once' && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mt: 1 }}
-                    >
-                      Reopens {row.manual.reopen} after completion.
-                    </Typography>
-                  )}
-                </Box>
-              </>
-            )}
             <Typography
               variant="caption"
               sx={{
@@ -922,7 +1016,95 @@ const Page = () => {
             </Typography>
             {row.currentValue ? (
               <>
-                {cardPaths.map((key) => {
+                {unmatchedDiffEntries.map((entry) => {
+                  const acceptedPath = row.acceptedPaths?.[entry.Property]
+                  return (
+                    <Box
+                      key={entry.Property}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: '12px',
+                        border: '1px solid',
+                        borderColor: acceptedPath ? 'divider' : 'error.main',
+                        bgcolor: 'background.paper',
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent="space-between"
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 600, fontFamily: 'monospace' }}
+                          noWrap
+                        >
+                          {entry.Property}
+                        </Typography>
+                        {acceptedPath ? (
+                          <Tooltip
+                            title={`${acceptedPath.reason} (${acceptedPath.by})`}
+                          >
+                            <Chip
+                              variant="outlined"
+                              size="small"
+                              color="info"
+                              label="Accepted"
+                            />
+                          </Tooltip>
+                        ) : (
+                          <Chip
+                            variant="outlined"
+                            size="small"
+                            color="error"
+                            label="Drift"
+                          />
+                        )}
+                      </Stack>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontFamily: 'monospace',
+                          display: 'block',
+                          mt: 0.5,
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        Expected: {JSON.stringify(entry.ExpectedValue)}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontFamily: 'monospace',
+                          display: 'block',
+                          wordBreak: 'break-word',
+                          color: acceptedPath ? 'text.secondary' : 'error.main',
+                        }}
+                      >
+                        Current: {JSON.stringify(entry.ReceivedValue)}
+                      </Typography>
+                      {!acceptedPath && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<CheckCircle />}
+                          sx={{ mt: 1 }}
+                          onClick={() => {
+                            setAcceptPathTarget({
+                              ...row,
+                              path: entry.Property,
+                            })
+                            acceptPathDialog.handleOpen()
+                          }}
+                        >
+                          Accept this property only
+                        </Button>
+                      )}
+                    </Box>
+                  )
+                })}
+                {orderedCardPaths.map((key) => {
                   const drifted = differences.includes(key)
                   const acceptedPath = row.acceptedPaths?.[key]
                   return (
@@ -1018,94 +1200,6 @@ const Page = () => {
                     </Box>
                   )
                 })}
-                {unmatchedDiffEntries.map((entry) => {
-                  const acceptedPath = row.acceptedPaths?.[entry.Property]
-                  return (
-                    <Box
-                      key={entry.Property}
-                      sx={{
-                        p: 1.5,
-                        borderRadius: '12px',
-                        border: '1px solid',
-                        borderColor: acceptedPath ? 'divider' : 'error.main',
-                        bgcolor: 'background.paper',
-                      }}
-                    >
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                        justifyContent="space-between"
-                      >
-                        <Typography
-                          variant="subtitle2"
-                          sx={{ fontWeight: 600, fontFamily: 'monospace' }}
-                          noWrap
-                        >
-                          {entry.Property}
-                        </Typography>
-                        {acceptedPath ? (
-                          <Tooltip
-                            title={`${acceptedPath.reason} (${acceptedPath.by})`}
-                          >
-                            <Chip
-                              variant="outlined"
-                              size="small"
-                              color="info"
-                              label="Accepted"
-                            />
-                          </Tooltip>
-                        ) : (
-                          <Chip
-                            variant="outlined"
-                            size="small"
-                            color="error"
-                            label="Drift"
-                          />
-                        )}
-                      </Stack>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontFamily: 'monospace',
-                          display: 'block',
-                          mt: 0.5,
-                          wordBreak: 'break-word',
-                        }}
-                      >
-                        Expected: {JSON.stringify(entry.ExpectedValue)}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          fontFamily: 'monospace',
-                          display: 'block',
-                          wordBreak: 'break-word',
-                          color: acceptedPath ? 'text.secondary' : 'error.main',
-                        }}
-                      >
-                        Current: {JSON.stringify(entry.ReceivedValue)}
-                      </Typography>
-                      {!acceptedPath && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<CheckCircle />}
-                          sx={{ mt: 1 }}
-                          onClick={() => {
-                            setAcceptPathTarget({
-                              ...row,
-                              path: entry.Property,
-                            })
-                            acceptPathDialog.handleOpen()
-                          }}
-                        >
-                          Accept this property only
-                        </Button>
-                      )}
-                    </Box>
-                  )
-                })}
                 {(differences.length > 0 ||
                   unmatchedDiffEntries.length > 0) && (
                   <Typography variant="caption" color="text.secondary">
@@ -1121,6 +1215,65 @@ const Page = () => {
                   No data has been collected for this standard yet - this is the
                   configuration that will apply.
                 </Typography>
+              </>
+            )}
+            {(row.manual?.taskName || row.manual?.instructions) && (
+              <>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 600,
+                    color: 'text.secondary',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Manual Task
+                </Typography>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '12px',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                  }}
+                >
+                  {row.manual.taskName && (
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      {row.manual.taskName}
+                    </Typography>
+                  )}
+                  {row.manual.instructions && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}
+                    >
+                      {row.manual.instructions}
+                    </Typography>
+                  )}
+                  {row.manual.documentationUrl && (
+                    <Link
+                      href={row.manual.documentationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      variant="caption"
+                      sx={{ display: 'inline-block', mt: 1 }}
+                    >
+                      Open documentation
+                    </Link>
+                  )}
+                  {row.manual.reopen && row.manual.reopen !== 'once' && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mt: 1 }}
+                    >
+                      Reopens {row.manual.reopen} after completion.
+                    </Typography>
+                  )}
+                </Box>
               </>
             )}
             <Typography
@@ -2167,6 +2320,7 @@ const Page = () => {
               queryKey={`ListBaselineAlignment-${currentTenant}-standards-table`}
               title={`Applicable Standards - ${tenant.displayName}`}
               data={tenant.rows}
+              isFetching={resolvedApi.isFetching}
               refreshFunction={resolvedApi}
               actions={tenantActions}
               offCanvas={tenantOffCanvas}
@@ -2197,6 +2351,9 @@ const Page = () => {
       key={viewMode}
       title={pageTitle}
       data={isTemplateView ? baselines : standardAggregates}
+      isFetching={
+        isTemplateView ? baselinesApi.isFetching : aggregateApi.isFetching
+      }
       refreshFunction={isTemplateView ? baselinesApi : aggregateApi}
       tenantInTitle={false}
       tableFilter={
