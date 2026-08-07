@@ -25,6 +25,8 @@ import { useSecureScore } from '../hooks/use-securescore'
 import { ApiGetCall } from '../api/ApiCall'
 import { ShadowAIReportPages } from './ShadowAIReportButton'
 import { DEFAULT_BRANDING_OPTION } from './ReportBuilder/reportSettings'
+import { useReportVariables } from './CippPdf/useReportVariables'
+import { useBrandingSettings } from './CippPdf/useBrandingSettings'
 import {
   Bold,
   BulletList,
@@ -78,6 +80,7 @@ export const ExecutiveReportDocument = ({
   tenantName,
   userStats,
   brandingSettings,
+  variables,
   secureScoreData,
   licensingData,
   deviceData,
@@ -535,6 +538,7 @@ export const ExecutiveReportDocument = ({
       tenantName={tenantName}
       reportName="Executive Summary"
       generatedOn={currentDate}
+      variables={variables}
       coverLabel="SECURITY ASSESSMENT"
       coverTitle="Executive"
       coverAccent="Summary"
@@ -1309,13 +1313,14 @@ export const ExecutiveReportDocument = ({
 export const ExecutiveReportButton = (props) => {
   const { variant: buttonVariant, onClick: onClickProp, ...other } = props
   const settings = useSettings()
+  const defaultBranding = useBrandingSettings()
 
   // Preview state
   const [previewOpen, setPreviewOpen] = useState(false)
   // Null until the operator picks one, so the branding setting for this report type keeps applying
   // as it changes. An explicit choice — including "Default" — wins from then on.
   const [presetOverride, setPresetOverride] = useState(null)
-  const brandingPresetId = presetOverride ?? settings.customBranding?.reportDefaults?.executive ?? ''
+  const brandingPresetId = presetOverride ?? defaultBranding?.reportDefaults?.executive ?? ''
 
   // Named branding sets a report can be rendered against instead of the default branding.
   const brandingPresets = ApiGetCall({
@@ -1339,12 +1344,14 @@ export const ExecutiveReportButton = (props) => {
   )
 
   const brandingSettings = useMemo(() => {
-    if (!brandingPresetId) return settings.customBranding
+    if (!brandingPresetId) return defaultBranding
     const presets = Array.isArray(brandingPresets.data) ? brandingPresets.data : []
     // A preset deleted since it was picked falls back to the default branding rather than
     // rendering unbranded.
-    return presets.find((preset) => preset.id === brandingPresetId) || settings.customBranding
-  }, [brandingPresetId, brandingPresets.data, settings.customBranding])
+    return presets.find((preset) => preset.id === brandingPresetId) || defaultBranding
+  }, [brandingPresetId, brandingPresets.data, defaultBranding])
+
+  const variables = useReportVariables()
 
   const [sectionConfig, setSectionConfig] = useState({
     executiveSummary: true,
@@ -1523,6 +1530,7 @@ export const ExecutiveReportButton = (props) => {
           standardsData={driftComplianceData.data}
           organizationData={organizationRecord}
           brandingSettings={brandingSettings}
+          variables={variables}
           secureScoreData={secureScore.isSuccess ? secureScore : null}
           licensingData={licenseData.isSuccess ? licenseData?.data : null}
           deviceData={deviceData.isSuccess ? deviceData?.data?.Results : null}
@@ -1559,6 +1567,9 @@ export const ExecutiveReportButton = (props) => {
     organizationRecord,
     dashboard.data,
     brandingSettings,
+    // Resolved asynchronously, so without this the document keeps the copy built before the
+    // values landed and the footer shows %cippurl% instead of the URL.
+    variables,
     secureScore?.isSuccess,
     licenseData?.isSuccess,
     deviceData?.isSuccess,
@@ -1942,6 +1953,7 @@ export const ExecutiveReportButton = (props) => {
                   standardsData={driftComplianceData.data}
                   organizationData={organizationRecord}
                   brandingSettings={brandingSettings}
+                  variables={variables}
                   secureScoreData={secureScore.isSuccess ? secureScore : null}
                   licensingData={licenseData.isSuccess ? licenseData?.data : null}
                   deviceData={deviceData.isSuccess ? deviceData?.data?.Results : null}
