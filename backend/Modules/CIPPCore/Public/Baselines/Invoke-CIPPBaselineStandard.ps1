@@ -7,29 +7,7 @@ function Invoke-CIPPBaselineStandard {
         Licensing is handled upstream: Start-CIPPBaselineOrchestrator strips unlicensed pairs
         before anything runs. Work items arrive through the durable pipeline as Hashtables -
         everything item-derived is normalized before use. Flow:
-        1. manual definitions track operator completion on the resolved row (reopen on the
-           configured recurrence); custom definitions delegate to their own
-           Invoke-CIPPBaseline<StandardName> script.
-        2. Read the current value from the CIPPDb cache (cacheType -> optional array
-           dot-path descend/flatten -> filter[] (properties may be dot-paths) -> object
-           dot-path). On a cache miss the engine triggers the central collector for that
-           cacheType and re-reads once; if there is still nothing, NOTHING is written - the
-           row stays 'No Data' and retries naturally on the next run.
-        3. Render the expected template from the configured variable values, project the
-           current value to the expected keys and compare with Compare-CIPPIntuneObject
-           (subset). Differences on accepted property paths are tolerated.
-        4. One Status per row: Compliant / Drift / Accepted / Partially Accepted /
-           Denied - Remediate Pending / Denied - Delete Pending / Skipped - No License.
-           Accepted holds until its unix expiry (optionally remediating on lapse); a row
-           whose drift is fully covered by accepted property paths also scores Accepted,
-           and partially covered drift scores Partially Accepted. Denied - Remediate
-           Pending forces remediation regardless of the configured posture. Writes only
-           happen when needed: drift, -Force (manual runs), or "checkBeforeRun": false
-           definitions - and never while accepted paths cover live drift, because a write
-           deploys the whole expected object.
-        5. Persist the resolved row + a history row via Set-CIPPBaselineResult.
-        Modes: run (all steps), compare (never writes), oneoff (remediation forced on).
-    .FUNCTIONALITY
+     .FUNCTIONALITY
         Internal
     #>
     [CmdletBinding()]
@@ -54,6 +32,19 @@ function Invoke-CIPPBaselineStandard {
         if ($null -eq $Template) { return $null }
         if ($Variables -is [System.Collections.IDictionary]) { $Variables = [PSCustomObject]$Variables }
         $Json = ConvertTo-Json -Compress -Depth 100 -InputObject $Template
+        # A variable declared omitWhenBlank that is left blank (or never configured)
+        # removes its key entirely - 'keep the tenant's current value': the setting is
+        # neither graded nor written. Pruned on the serialized template before
+        # substitution, so expected AND remediate specs stay consistent (keys whose
+        # value is exactly the "%var%" token).
+        foreach ($Declared in (($Definition.variables ?? [PSCustomObject]@{}).PSObject.Properties)) {
+            if ($Declared.Value.omitWhenBlank -ne $true) { continue }
+            if (-not [string]::IsNullOrEmpty("$(($Variables ?? [PSCustomObject]@{}).($Declared.Name))")) { continue }
+            $Escaped = [regex]::Escape(('%{0}%' -f $Declared.Name))
+            $Json = [regex]::Replace($Json, ('"[^"]*":"{0}",' -f $Escaped), '')
+            $Json = [regex]::Replace($Json, (',"[^"]*":"{0}"' -f $Escaped), '')
+            $Json = [regex]::Replace($Json, ('"[^"]*":"{0}"' -f $Escaped), '')
+        }
         foreach ($Variable in (($Variables ?? [PSCustomObject]@{}).PSObject.Properties)) {
             $Token = '%{0}%' -f $Variable.Name
             $EncodedValue = ConvertTo-Json -Compress -Depth 100 -InputObject $Variable.Value
@@ -78,10 +69,29 @@ function Invoke-CIPPBaselineStandard {
         # capabilities cache is per tenant with a 24h TTL, so at most one Graph call per
         # tenant per day. A oneoff is an explicit operator ask and bypasses the gate - the
         # cache may not know about a license bought after the last sync.
+        # A flat requiredCapabilities list is any-of. A nested array is a GROUP that must
+        # also match: every group needs at least one licensed capability (AND of any-of
+        # groups) - AtpPolicyForO365 needs a SharePoint plan AND a Defender for Office 365
+        # plan, exactly like the classic standard's two license gates.
         $Required = @($Definition.requiredCapabilities)
         if ($Required.Count -gt 0 -and $Mode -ne 'oneoff') {
             $Capabilities = $(try { Get-CIPPTenantCapabilities -TenantFilter $TenantFilter } catch { $null })
-            if (@($Required | Where-Object { $Capabilities.$_ -eq $true }).Count -eq 0) {
+            # Built as a List: an if-expression's pipeline output unwraps one array
+            # level, which silently turned every capability into its own AND-group.
+            $Groups = [System.Collections.Generic.List[object]]::new()
+            if (@($Required | Where-Object { $_ -is [System.Array] }).Count -gt 0) {
+                foreach ($Entry in $Required) { $Groups.Add(@($Entry)) }
+            } else {
+                $Groups.Add(@($Required))
+            }
+            $Licensed = $true
+            foreach ($Group in $Groups) {
+                if (@(@($Group) | Where-Object { $Capabilities.$_ -eq $true }).Count -eq 0) {
+                    $Licensed = $false
+                    break
+                }
+            }
+            if (-not $Licensed) {
                 $Skipped = [PSCustomObject]@{
                     Item                = $Item
                     Mode                = $Mode
@@ -238,6 +248,30 @@ function Invoke-CIPPBaselineStandard {
             return $Result
         }
 
+        # 1b00. Unconfigured REQUIRED variable: the baseline was saved without a value the
+        # definition cannot substitute for, so the render leaves the raw "%var%" token in the
+        # spec. That token is not a value - comparing it is permanent drift, and remediating
+        # it sends the literal string to the API (CSOM/Graph/EXO accept a garbage string for
+        # a typed setting). Nothing is compared and nothing is written; the row keeps
+        # whatever it last knew and the operator gets a named error, the way the classic
+        # standards validated their input and aborted. Only variables the definition marks
+        # `required` are gated: a blank optional field (an empty exclude group, no
+        # documentation link) is a legitimate configuration, and omitWhenBlank fields have
+        # their key pruned rather than left behind.
+        $ConfiguredVariables = $Item.Variables ?? [PSCustomObject]@{}
+        $Unresolved = @(($Definition.variables ?? [PSCustomObject]@{}).PSObject.Properties | Where-Object {
+                $_.Value.required -eq $true -and
+                [string]::IsNullOrEmpty("$($ConfiguredVariables.$($_.Name))")
+            } | ForEach-Object { $_.Name })
+        if ($Unresolved.Count -gt 0) {
+            $Missing = $Unresolved -join ', '
+            Write-LogMessage -API 'Baselines' -tenant $TenantFilter -message "`"$Label`" is missing a value for $Missing - nothing is compared or changed until the baseline configures it. - Run $RunId" -Sev 'Error'
+            $null = Add-CIPPBaselineHistoryEvent -TenantFilter $TenantFilter -Standard $Item.Standard -Mode $Mode -TriggeredBy $TriggeredBy -Outcome 'Error' -Detail "Not configured: no value for $Missing - the standard was skipped instead of comparing or writing the raw variable name." -RunId $RunId
+            $Result.Outcome = 'Error'
+            $Result.Status = $PriorStatus ?? 'No Data'
+            return $Result
+        }
+
         # 1b. Manual tasks: state lives on the resolved row; the operator completes them.
         if ($Definition.manual) {
             $Manual = & $Render $Definition.manual $Item.Variables
@@ -380,45 +414,49 @@ function Invoke-CIPPBaselineStandard {
                 }
             }
         }
-
-        # checkBeforeRun=false marks standards whose pre-check cannot prove the write is
-        # unnecessary (e.g. a CA template compare only sees name/state) - they write whenever
-        # remediation applies, cache or not. A missing cache does NOT return early: the
-        # engine fails OPEN - when the current state cannot be read, an enforced standard
-        # still applies its expected state, and only a compare/report-only run skips.
         $CheckBeforeRun = $Definition.checkBeforeRun -ne $false
 
-        # 3. Project to the expected keys (subset compare) and diff. A key the current object
-        # lacks stays present as $null so the compare flags the presence mismatch.
+
+        $ReadDefaults = $Definition.read.defaults
         $Differences = @()
         $PreFilterDifferences = @()
+        $ProjectNode = $null
+        $ProjectNode = {
+            param($ExpectedNode, $CurrentNode)
+            $Node = [PSCustomObject]@{}
+            foreach ($Property in $ExpectedNode.PSObject.Properties) {
+                $Value = if ($null -ne $CurrentNode) { $CurrentNode.$($Property.Name) } else { $null }
+                # $anyOf sets are leaf declarations, not shapes to descend into.
+                if ($Property.Value -is [System.Management.Automation.PSCustomObject] -and
+                    -not $Property.Value.PSObject.Properties['$anyOf'] -and
+                    $Value -is [System.Management.Automation.PSCustomObject]) {
+                    $Value = & $ProjectNode $Property.Value $Value
+                }
+                $Node | Add-Member -NotePropertyName $Property.Name -NotePropertyValue $Value
+            }
+            $Node
+        }
         if ($null -ne $Current) {
             $Projected = [PSCustomObject]@{}
             foreach ($Property in $Expected.PSObject.Properties.Name) {
-                $Projected | Add-Member -NotePropertyName $Property -NotePropertyValue $Current.$Property
+                $Value = $Current.$Property
+                $ExpectedLeaf = $Expected.$Property
+                if (-not $Definition.prepare -and
+                    $ExpectedLeaf -is [System.Management.Automation.PSCustomObject] -and
+                    -not $ExpectedLeaf.PSObject.Properties['$anyOf'] -and
+                    $Value -is [System.Management.Automation.PSCustomObject]) {
+                    $Value = & $ProjectNode $ExpectedLeaf $Value
+                }
+                if ($null -eq $Value -and $null -ne $ReadDefaults -and $ReadDefaults.PSObject.Properties[$Property]) {
+                    $Value = $ReadDefaults.$Property
+                }
+                $Projected | Add-Member -NotePropertyName $Property -NotePropertyValue $Value
             }
             $Result.CurrentValue = $Projected
-            # The compare copy of expected resolves $anyOf against the CURRENT value: a
-            # member of the set compares equal, a non-member diffs against the canonical.
             $CompareExpected = & $ResolveAnyOf $ExpectedTemplate $Current $true
-            # Compare-CIPPIntuneObject emits $null (not an empty set) when nothing differs.
-            # A prepare hook may request a CompareType (e.g. 'Catalog' flattens settings
-            # catalog policies to per-setting rows, 'AppProtection' widens the excludes).
             $CompareTypes = @($Prepared.CompareType | Where-Object { $_ })
             $Differences = @(Compare-CIPPIntuneObject -ReferenceObject $CompareExpected -DifferenceObject $Projected -CompareType $CompareTypes | Where-Object { $_ })
 
-            # Hard compares: the shared compare treats false/0/null/''/[] as interchangeable
-            # empties, which would let 'not configured' satisfy an explicit false/0
-            # expectation. The shared function stays untouched (CA/Intune depend on its
-            # semantics) - this only ADDS the diffs the engine's stricter reading requires:
-            # an expected boolean or number against an empty current value is drift.
-            # Definition-controlled via `hardCompare` (default ON; the CA/Intune template
-            # definitions set false - their prepare pipelines carry their own extensive
-            # normalization and the lenient empties-equivalence is load-bearing there).
-            # Two boundaries when enabled: properties the compare deliberately excludes
-            # (read-only server state like qualityUpdatesWillBeRolledBack) are never
-            # hard-gapped - same list, one source; and flatten-based Catalog compares
-            # skip the walker entirely (their paths don't align with the raw tree).
             $HardCompareEnabled = $Definition.hardCompare -ne $false
             $HardGapExclusions = @(Get-CIPPIntuneCompareExclusions -AppProtection:($CompareTypes -contains 'AppProtection'))
             $AddHardGaps = $null
@@ -512,8 +550,8 @@ function Invoke-CIPPBaselineStandard {
                 foreach ($DeletedKey in $DeletedKeys) { $AcceptedPaths.PSObject.Properties.Remove($DeletedKey) }
                 $AcceptedKeys = @($AcceptedPaths.PSObject.Properties.Name | Where-Object { $_ })
                 $DenyDeleteKeys = @($AcceptedPaths.PSObject.Properties | Where-Object { $_.Name -and $_.Value.verdict -eq 'denyDelete' } | ForEach-Object { $_.Name })
-                 if ($Prior) { $Prior | Add-Member -NotePropertyName 'AcceptedPaths' -NotePropertyValue (ConvertTo-Json -Compress -Depth 20 -InputObject $AcceptedPaths) -Force }
-                 $DropDeleted = {
+                if ($Prior) { $Prior | Add-Member -NotePropertyName 'AcceptedPaths' -NotePropertyValue (ConvertTo-Json -Compress -Depth 20 -InputObject $AcceptedPaths) -Force }
+                $DropDeleted = {
                     param($Entries)
                     @($Entries | Where-Object {
                             $Property = $_.Property
@@ -527,7 +565,7 @@ function Invoke-CIPPBaselineStandard {
                 $Result.Remediated = $true
                 $Compliant = ($Differences.Count -eq 0)
                 $PathAccepted = $PreFilterDifferences.Count -gt $Differences.Count
-                   if ($DenyDeleteKeys.Count -eq 0 -and $PriorStatus -eq 'Denied - Delete Pending') { $PriorStatus = 'Drift' }
+                if ($DenyDeleteKeys.Count -eq 0 -and $PriorStatus -eq 'Denied - Delete Pending') { $PriorStatus = 'Drift' }
             }
         }
 

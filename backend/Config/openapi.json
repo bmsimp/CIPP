@@ -764,7 +764,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.ReadWrite",
+        "x-cipp-role": "Tenant.Baselines.ReadWrite",
         "x-cipp-reads-via": [
           "New-CIPPBaseline"
         ]
@@ -14386,7 +14386,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.ReadWrite"
+        "x-cipp-role": "Tenant.Baselines.ReadWrite"
       }
     },
     "/api/ExecBaselineRun": {
@@ -14461,7 +14461,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.ReadWrite"
+        "x-cipp-role": "Tenant.BaselinesRun.ReadWrite"
       }
     },
     "/api/ExecBaselineStage": {
@@ -14525,7 +14525,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.ReadWrite"
+        "x-cipp-role": "Tenant.Baselines.ReadWrite"
       }
     },
     "/api/ExecBECCheck": {
@@ -16327,7 +16327,8 @@
                     "type": "boolean"
                   },
                   "FullName": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Pretty-printed, not compressed: repo files are hand-edited on GitHub."
                   },
                   "GUID": {
                     "type": "string",
@@ -16337,7 +16338,8 @@
                     "type": "string"
                   },
                   "Message": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Pretty-printed, not compressed: repo files are hand-edited on GitHub."
                   },
                   "Path": {
                     "type": "string"
@@ -34605,7 +34607,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.ReadWrite"
+        "x-cipp-role": "Tenant.BaselinesDeviations.ReadWrite"
       }
     },
     "/api/ExecUpdateDriftDeviation": {
@@ -37995,7 +37997,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.Read"
+        "x-cipp-role": "Tenant.Baselines.Read"
       }
     },
     "/api/ListBaselines": {
@@ -38062,7 +38064,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.Read"
+        "x-cipp-role": "Tenant.Baselines.Read"
       }
     },
     "/api/ListBaselineStandards": {
@@ -38103,7 +38105,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.Read"
+        "x-cipp-role": "Tenant.Baselines.Read"
       }
     },
     "/api/ListBasicAuth": {
@@ -59045,7 +59047,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Standards.ReadWrite"
+        "x-cipp-role": "Tenant.Baselines.ReadWrite"
       }
     },
     "/api/RemoveBPATemplate": {
