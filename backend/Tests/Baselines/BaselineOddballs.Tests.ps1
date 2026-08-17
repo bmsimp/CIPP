@@ -155,6 +155,21 @@ Describe 'Get-CIPPBaselineColleagueImpersonationAlertState' {
         }
     }
 
+    It 'OMITS the domain exemption parameter when the list is empty - Exchange rejects an empty one' {
+        # onmicrosoft-only tenants have no exemptable accepted domains; passing an empty
+        # ExceptIfSenderDomainIs failed every rule write on them.
+        Mock New-ExoRequest { }
+        $Current = [PSCustomObject]@{
+            ruleStates              = @([PSCustomObject]@{ RuleName = '(A-E) Colleague Impersonation Alert'; Range = 'A-E'; Names = @('Alice'); RuleExists = $false
+                    ExistingExemptSender = @(); ExistingExemptDomain = @(); ExistingDisclaimer = '' })
+            autoExemptDomains       = @(); additionalExemptSenders = @()
+        }
+        Invoke-CIPPBaselineColleagueImpersonationAlert -Remediate ([PSCustomObject]@{ disclaimerHtml = '<b>W</b>' }) -TenantFilter $script:Tenant -Current $Current
+        Should -Invoke New-ExoRequest -Times 1 -Exactly -ParameterFilter {
+            $cmdlet -eq 'New-TransportRule' -and -not $cmdParams.ContainsKey('ExceptIfSenderDomainIs')
+        }
+    }
+
     It 'refuses to write an empty banner: no configured HTML and no fallback throws' {
         Mock New-ExoRequest { }
         $Current = [PSCustomObject]@{
@@ -283,6 +298,19 @@ Describe 'Get-CIPPBaselineIntuneAppTemplateDeployState' {
         $Prepared = Get-CIPPBaselineIntuneAppTemplateDeployState -Item $Item -TenantFilter $script:Tenant
         @($Prepared.Current.missingApps) | Should -Be @('7-Zip')
         @($Prepared.Current.missingAppObjects)[0].AppType | Should -Be 'StoreApp'
+    }
+
+    It 'a NAMELESS template app is skipped with a warning instead of an unnameable missing-app row' {
+        Mock Get-CIPPAzDataTableEntity { [PSCustomObject]@{ JSON = (@{ Displayname = 'Broken'; Apps = @(
+                        @{ appType = 'chocolateyApp'; appName = ''; config = @{ AssignTo = 'AllDevices' } }
+                        @{ appType = 'StoreApp'; appName = '7zip'; config = @{ ApplicationName = '7-Zip' } }
+                    ) } | ConvertTo-Json -Depth 10) } }
+        Mock New-CIPPDbRequest { @((@{ displayName = 'nothing'; '@odata.type' = '#microsoft.graph.win32LobApp' } | ConvertTo-Cached)) }
+        Mock Write-LogMessage { }
+        $Item = [PSCustomObject]@{ Variables = [PSCustomObject]@{ templateIds = @('t-broken') } }
+        $Prepared = Get-CIPPBaselineIntuneAppTemplateDeployState -Item $Item -TenantFilter $script:Tenant
+        @($Prepared.Current.missingApps) | Should -Be @('7-Zip')
+        Should -Invoke Write-LogMessage -Times 1 -Exactly -ParameterFilter { $message -like '*no name*' }
     }
 
     It 'the executor maps template types to queue types and continues past per-app failures' {

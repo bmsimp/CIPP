@@ -85,6 +85,34 @@ Describe 'Get-CIPPBaselineDefenderAVPolicyState' {
         $Prepared.Expected.PSObject.Properties.Name | Should -Not -Contain 'remediationSevere'
     }
 
+    It 'grades blank integers as the write-side defaults - the recreate writes 50/8, never 0' {
+        Mock New-CIPPDbRequest { @($script:AvPolicy | ConvertTo-Cached) }
+        $Item = [PSCustomObject]@{ Variables = [PSCustomObject]@{ ScanArchives = $true; AvgCPULoadFactor = ''; SignatureUpdateInterval = ''; CloudExtendedTimeout = '' } }
+        $Prepared = Get-CIPPBaselineDefenderAVPolicyState -Item $Item -TenantFilter $script:Tenant
+        $Prepared.Expected.avgCPULoadFactor | Should -Be 50
+        $Prepared.Expected.signatureUpdateInterval | Should -Be 8
+        $Prepared.Expected.cloudExtendedTimeout | Should -Be 0
+    }
+
+    It 'grades a choice setting ONLY when configured - the recreate omits blank ones' {
+        Mock New-CIPPDbRequest { @($script:AvPolicy | ConvertTo-Cached) }
+        $Item = [PSCustomObject]@{ Variables = [PSCustomObject]@{ ScanArchives = $true; EnableNetworkProtection = ''; SubmitSamplesConsent = $null } }
+        $Prepared = Get-CIPPBaselineDefenderAVPolicyState -Item $Item -TenantFilter $script:Tenant
+        $Prepared.Expected.PSObject.Properties.Name | Should -Not -Contain 'enableNetworkProtection'
+        $Prepared.Expected.PSObject.Properties.Name | Should -Not -Contain 'cloudBlockLevel'
+        $Prepared.Expected.PSObject.Properties.Name | Should -Not -Contain 'submitSamplesConsent'
+    }
+
+    It 'grades a configured choice setting against the policy, absent setting as empty' {
+        Mock New-CIPPDbRequest { @($script:AvPolicy | ConvertTo-Cached) }
+        $Item = [PSCustomObject]@{ Variables = [PSCustomObject]@{ EnableNetworkProtection = '0'; CloudBlockLevel = [PSCustomObject]@{ value = '2' } } }
+        $Prepared = Get-CIPPBaselineDefenderAVPolicyState -Item $Item -TenantFilter $script:Tenant
+        $Prepared.Expected.enableNetworkProtection | Should -Be '0'
+        $Prepared.Current.enableNetworkProtection | Should -Be ''
+        $Prepared.Expected.cloudBlockLevel | Should -Be '2'
+        $Prepared.Current.cloudBlockLevel | Should -Be '2'
+    }
+
     It 'deletes the drifted policy before the helper recreates it' {
         Mock New-GraphPostRequest { }
         Mock Set-CIPPDefenderAVPolicy { 'ok' }
@@ -147,6 +175,12 @@ Describe 'Get-CIPPBaselineDefenderExclusionPolicyState' {
         $Item2 = [PSCustomObject]@{ Variables = [PSCustomObject]@{ excludedPaths = 'C:\App' } }
         $Prepared2 = Get-CIPPBaselineDefenderExclusionPolicyState -Item $Item2 -TenantFilter $script:Tenant
         (Get-Verdict -Expected $Prepared2.Expected -Current $Prepared2.Current).Count | Should -BeGreaterThan 0
+    }
+
+    It 'ALL-EMPTY collections report No Data - a zero-exclusion policy never materializes' {
+        Mock New-CIPPDbRequest { @() }
+        $Item = [PSCustomObject]@{ Variables = [PSCustomObject]@{ excludedExtensions = ''; excludedPaths = ''; excludedProcesses = '' } }
+        (Get-CIPPBaselineDefenderExclusionPolicyState -Item $Item -TenantFilter $script:Tenant).Current | Should -BeNullOrEmpty
     }
 
     It 'sends ONLY the configured collections to the helper' {
@@ -260,6 +294,17 @@ Describe 'Get-CIPPBaselineDevicePrepProfileState' {
                 @{ settingInstance = @{ settingDefinitionId = 'enrollment_autopilot_dpp_customerrormessage'; simpleSettingValue = @{ value = 'msg' } } }
                 @{ settingInstance = @{ settingDefinitionId = 'enrollment_autopilot_dpp_devicesecuritygroupids'; simpleSettingValue = @{ value = '' } } }
             ) }
+    }
+
+    It 'EMPTY-STRING timeout and error message grade as the defaults the executor writes' {
+        # '' survives ?? (only null falls through) and [int]'' is 0 - which graded
+        # timeout 0 / message '' against the 60 / default text the executor deploys.
+        Mock New-CIPPDbRequest { @($script:DppPolicy | ConvertTo-Cached) }
+        Mock Compare-CIPPIntuneAssignments { [PSCustomObject]@{ Unknown = $true } }
+        $Item = [PSCustomObject]@{ Variables = [PSCustomObject]@{ ProfileName = 'CIPP Device Prep'; Timeout = ''; CustomErrorMessage = ''; AssignTo = 'none' } }
+        $Prepared = Get-CIPPBaselineDevicePrepProfileState -Item $Item -TenantFilter $script:Tenant
+        $Prepared.Expected.timeout | Should -Be 60
+        $Prepared.Expected.customErrorMessage | Should -Match 'support person'
     }
 
     It 'an UNKNOWN assignment lookup leaves the dimension out of the grade entirely' {
