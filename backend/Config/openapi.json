@@ -35429,7 +35429,7 @@
         "tags": [
           "CIPP > Core"
         ],
-        "description": "Compares the caller's reported CIPP version against the latest published release and reports whether the frontend or the API is out of date.",
+        "description": "Compares the caller's reported CIPP version against the latest published release and reports whether the frontend or the API is out of date, alongside the hosting shape (hosting type, App Service SKU, runtime stack) and the recorded version-update history.",
         "parameters": [
           {
             "name": "LocalVersion",
@@ -35447,7 +35447,27 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                  "properties": {
+                    "LocalCIPPAPIVersion": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "LocalCIPPVersion": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "OutOfDateCIPP": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "OutOfDateCIPPAPI": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "RemoteCIPPAPIVersion": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "RemoteCIPPVersion": {
+                      "x-cipp-field-source": "backend"
+                    }
+                  }
                 }
               }
             }
@@ -37736,22 +37756,34 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
                     "properties": {
                       "Data": {
-                        "x-cipp-field-source": "backend"
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "ETag": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
                       },
                       "LogId": {
                         "x-cipp-field-source": "backend"
                       },
+                      "PartitionKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "RowKey": {
+                        "x-cipp-field-source": "storage"
+                      },
                       "Tenant": {
-                        "x-cipp-field-source": "backend"
+                        "x-cipp-field-source": "storage,backend"
                       },
                       "Timestamp": {
-                        "x-cipp-field-source": "backend"
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
                       },
                       "Title": {
-                        "x-cipp-field-source": "backend"
+                        "x-cipp-field-source": "storage,backend"
                       }
                     }
                   }
@@ -46138,6 +46170,9 @@
                         "x-cipp-field-source": "frontend"
                       },
                       "lastSignInDateTime": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "lastSuccessfulSignInDateTime": {
                         "x-cipp-field-source": "frontend"
                       },
                       "numberOfAssignedLicenses": {
