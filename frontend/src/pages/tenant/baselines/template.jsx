@@ -51,6 +51,7 @@ import { CippApiResults } from '../../../components/CippComponents/CippApiResult
 const conditionTypeOptions = [
   { label: 'Time in previous stage', value: 'time' },
   { label: 'Tenant variable', value: 'variable' },
+  { label: 'Is in tenant group', value: 'group' },
   { label: 'All previous stage items applied successfully', value: 'success' },
   { label: 'Manual approval by an operator', value: 'manual' },
 ]
@@ -87,6 +88,10 @@ const toConditionDefaults = (condition) => ({
     (option) => option.value === condition.operator
   ),
   value: condition.value,
+  // The stored groupName keeps the picker readable without waiting for the group list.
+  group: condition.group
+    ? { label: condition.groupName ?? condition.group, value: condition.group }
+    : undefined,
 })
 
 // The API serializes single-element arrays as a bare object; normalize before handing
@@ -142,6 +147,7 @@ const StagePanel = ({
   catalogByName,
   registerSerializer,
   variableOptions,
+  groupOptions,
 }) => {
   const formControl = useForm({
     mode: 'onBlur',
@@ -234,6 +240,8 @@ const StagePanel = ({
             variable: unwrapValue(condition.variable),
             operator: unwrapValue(condition.operator),
             value: condition.value,
+            group: unwrapValue(condition.group),
+            groupName: condition.group?.label ?? unwrapValue(condition.group),
           }
         }),
         standards: stage.standards.map((instanceKey) => {
@@ -318,11 +326,10 @@ const StagePanel = ({
               Graduation conditions
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Tenants graduate from Stage {stageIndex} into this stage when the
-              conditions below are met. Stages are cumulative: a tenant in this
-              stage also receives everything from the previous stages. If this
-              stage configures a standard an earlier stage also configures, the
-              settings here replace the earlier ones once the tenant arrives.
+              A tenant advances from Stage {stageIndex} into this stage once
+              the conditions below are met. Earlier stages keep applying; if
+              the same standard is configured in both, this stage's settings
+              win.
             </Typography>
             {conditionIds.length > 1 && (
               <Box sx={{ maxWidth: 380 }}>
@@ -439,6 +446,19 @@ const StagePanel = ({
                             />
                           </Box>
                         </Stack>
+                      )}
+                      {conditionType === 'group' && (
+                        <Box sx={{ maxWidth: 380 }}>
+                          <CippFormComponent
+                            type="autoComplete"
+                            name={`conditions.${conditionId}.group`}
+                            label="Tenant group"
+                            formControl={formControl}
+                            options={groupOptions}
+                            multiple={false}
+                            creatable={false}
+                          />
+                        </Box>
                       )}
                       {conditionType === 'success' && (
                         <Typography variant="body2" color="text.secondary">
@@ -591,6 +611,15 @@ const Page = () => {
     url: '/api/ListCustomVariables',
     queryKey: 'ListCustomVariables',
   })
+  // Same query key as the Edit Tenant group picker so both share one cached list.
+  const tenantGroupsApi = ApiGetCall({
+    url: '/api/ListTenantGroups',
+    queryKey: 'AllTenantGroups',
+  })
+  const groupOptions = (tenantGroupsApi.data?.Results ?? []).map((group) => ({
+    label: group.Name,
+    value: group.Id,
+  }))
   // Graduation conditions compare against CIPP custom variables; reserved tenant tokens
   // are not useful graduation signals. Creatable, so any variable name can be typed.
   const variableOptions = (customVariablesApi.data?.Results ?? [])
@@ -1137,6 +1166,7 @@ const Page = () => {
                     catalogByName={catalogByName}
                     registerSerializer={registerSerializer}
                     variableOptions={variableOptions}
+                    groupOptions={groupOptions}
                   />
                 ))}
               </CardContent>
