@@ -43,6 +43,7 @@ const Page = () => {
     {
       label: 'View Group',
       link: `/identity/administration/groups/group?groupId=[id]&tenantFilter=${tenantQuery}`,
+      pinned: true,
       color: 'info',
       icon: <EyeIcon />,
       multiPost: false,
@@ -51,6 +52,7 @@ const Page = () => {
       //tested
       label: 'Edit Group',
       link: '/identity/administration/groups/edit?groupId=[id]&groupType=[groupType]',
+      pinned: true,
       multiPost: false,
       icon: <Edit />,
       color: 'success',
@@ -127,6 +129,8 @@ const Page = () => {
       ],
       confirmText:
         'Select the users to add as members to [displayName], or drop a CSV file with a userPrincipalName column to bulk add members.',
+      // Manual member adds are rejected on dynamic and on-prem synced groups
+      condition: (row) => !row?.membershipRule && row?.onPremisesSyncEnabled !== true,
       multiPost: false,
       allowResubmit: true,
     },
@@ -444,6 +448,10 @@ const Page = () => {
         }
         actions={actions}
         offCanvas={offCanvas}
+        rowOpen={{
+          link: `/identity/administration/groups/group?groupId=[id]&tenantFilter=${tenantQuery}`,
+          condition: (row) => Boolean(row?.id),
+        }}
         simpleColumns={[
           ...reportDB.cacheColumns,
           ...(reportDB.isAllTenants && reportDB.useReportDB ? ['Tenant'] : []),
@@ -481,6 +489,7 @@ const Page = () => {
                 {
                   label: 'View User',
                   link: `/identity/administration/users/user?userId=[id]&tenantFilter=${nestedTenantQuery}`,
+                  pinned: true,
                   color: 'info',
                   icon: <EyeIcon />,
                   condition: (row) =>
@@ -489,6 +498,7 @@ const Page = () => {
                 {
                   label: 'View Group',
                   link: `/identity/administration/groups/group?groupId=[id]&tenantFilter=${nestedTenantQuery}`,
+                  pinned: true,
                   color: 'info',
                   icon: <EyeIcon />,
                   condition: (row) => row?.['@odata.type'] === '#microsoft.graph.group',
@@ -551,6 +561,7 @@ const Page = () => {
                 {
                   label: 'View User',
                   link: `/identity/administration/users/user?userId=[id]&tenantFilter=${nestedTenantQuery}`,
+                  pinned: true,
                   color: 'info',
                   icon: <EyeIcon />,
                   condition: (row) =>

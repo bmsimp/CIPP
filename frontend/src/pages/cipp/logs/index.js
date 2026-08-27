@@ -43,6 +43,7 @@ const actions = [
   {
     label: 'View Log Entry',
     link: '/cipp/logs/logentry?logentry=[RowKey]&dateFilter=[DateFilter]',
+    pinned: true,
     icon: <EyeIcon />,
     color: 'primary',
   },
@@ -341,6 +342,10 @@ const Page = () => {
       }}
       actions={actions}
       offCanvas={offcanvas}
+      rowOpen={{
+        link: '/cipp/logs/logentry?logentry=[RowKey]&dateFilter=[DateFilter]',
+        condition: (row) => Boolean(row?.RowKey),
+      }}
     />
   )
 }

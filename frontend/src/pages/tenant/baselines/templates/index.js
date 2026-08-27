@@ -100,6 +100,7 @@ const Page = () => {
     {
       label: 'Edit Baseline',
       link: '/tenant/baselines/template?id=[GUID]',
+      pinned: true,
       icon: <Edit />,
       color: 'success',
       target: '_self',
@@ -364,7 +365,6 @@ const Page = () => {
       tenantInTitle={false}
       actions={actions}
       offCanvas={offCanvas}
-      offCanvasOnRowClick={true}
       cardButton={
         <>
           <Button
@@ -640,3 +640,4 @@ Page.getLayout = (page) => (
 )
 
 export default Page
+

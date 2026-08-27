@@ -16,6 +16,7 @@ const Page = () => {
     {
       label: "View Task Details",
       link: "/cipp/scheduler/task?id=[RowKey]",
+      pinned: true,
       icon: <EyeIcon />,
     },
     {
@@ -101,6 +102,10 @@ const Page = () => {
         ),
         size: "xl",
         actions: actions,
+      }}
+      rowOpen={{
+        link: '/cipp/scheduler/task?id=[RowKey]',
+        condition: (row) => Boolean(row?.RowKey),
       }}
     />
   );

@@ -95,6 +95,10 @@ const Page = () => {
         ]}
         actions={actions}
         offCanvas={offCanvas}
+        rowOpen={{
+          link: '/cipp/scheduler/task?id=[RowKey]',
+          condition: (row) => Boolean(row?.RowKey),
+        }}
         filters={filterList}
       />
 

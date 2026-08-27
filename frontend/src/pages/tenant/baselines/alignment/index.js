@@ -886,6 +886,7 @@ const Page = () => {
     {
       label: 'Edit Baseline',
       link: '/tenant/baselines/template?id=[templateId]',
+      pinned: true,
       icon: <Edit />,
       color: 'success',
       target: '_self',
@@ -1837,6 +1838,7 @@ const Page = () => {
     {
       label: 'Edit Baseline',
       link: '/tenant/baselines/template?id=[GUID]',
+      pinned: true,
       icon: <Edit />,
       color: 'success',
       target: '_self',
@@ -3046,7 +3048,6 @@ const Page = () => {
               refreshFunction={resolvedApi}
               actions={tenantActions}
               offCanvas={tenantOffCanvas}
-              offCanvasOnRowClick={true}
               filters={[...initialStatusFilter, ...tenantFilterList]}
               simpleColumns={[
                 'standardLabel',
@@ -3093,7 +3094,6 @@ const Page = () => {
       actions={isTemplateView ? templateActions : standardActions}
       filters={isTemplateView ? undefined : standardFilterList}
       offCanvas={isTemplateView ? templateOffCanvas : standardOffCanvas}
-      offCanvasOnRowClick={true}
       simpleColumns={
         isTemplateView
           ? [
@@ -3128,3 +3128,4 @@ Page.getLayout = (page) => (
 )
 
 export default Page
+
