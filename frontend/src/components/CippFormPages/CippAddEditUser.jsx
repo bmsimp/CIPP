@@ -26,6 +26,7 @@ const sharedCalendarPermissionOptions = [
 
 const sharedMailboxPermissionOptions = [
   { label: 'Full Access', value: 'FullAccess' },
+  { label: 'Full Access (no Automapping)', value: 'FullAccessNoAutoMap' },
   { label: 'Send As', value: 'SendAs' },
   { label: 'Send on Behalf', value: 'SendOnBehalf' },
 ]
@@ -495,7 +496,7 @@ const CippAddEditUser = (props) => {
             : 'Distribution list'
           : 'Security'
       return {
-        label: g.displayName,
+        label: g.mail ? `${g.displayName} - ${g.mail}` : g.displayName,
         value: g.id,
         addedFields: { groupType },
       }
@@ -1078,7 +1079,7 @@ const CippAddEditUser = (props) => {
               ? filteredTenantGroups
               : tenantGroups?.data
             )?.map((group) => ({
-              label: group.displayName,
+              label: group.mail ? `${group.displayName} - ${group.mail}` : group.displayName,
               value: group.id,
               addedFields: {
                 groupType: group.groupType,

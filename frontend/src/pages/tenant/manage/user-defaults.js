@@ -137,7 +137,8 @@ const Page = () => {
       type: 'autoComplete',
       api: {
         url: '/api/ListGroups',
-        labelField: 'displayName',
+        labelField: (option) =>
+          option?.mail ? `${option.displayName} - ${option.mail}` : option.displayName,
         valueField: 'id',
         queryKey: `ListGroups-${userSettings.currentTenant}`,
         addedField: {
@@ -169,6 +170,7 @@ const Page = () => {
       type: 'autoComplete',
       options: [
         { label: 'Full Access', value: 'FullAccess' },
+        { label: 'Full Access (no Automapping)', value: 'FullAccessNoAutoMap' },
         { label: 'Send As', value: 'SendAs' },
         { label: 'Send on Behalf', value: 'SendOnBehalf' },
       ],
