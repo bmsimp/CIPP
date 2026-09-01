@@ -233,6 +233,7 @@ const Page = () => {
                   queryKey: `ListMailboxes-${tenantFilter}`,
                   manualSearch: true,
                   searchParam: 'Anr',
+                  data: { Minimal: true },
                 }}
                 formControl={formControl}
               />
@@ -254,6 +255,7 @@ const Page = () => {
                   queryKey: `ListMailboxes-${tenantFilter}`,
                   manualSearch: true,
                   searchParam: 'Anr',
+                  data: { Minimal: true },
                 }}
                 formControl={formControl}
               />
@@ -358,9 +360,10 @@ const Page = () => {
               />
               <Typography
                 variant="caption"
-                color="text.secondary"
-                sx={{ ml: 'auto' }}
-              >
+                sx={{
+                  color: "text.secondary",
+                  ml: 'auto'
+                }}>
                 Searches cover up to 10 days at a time, going back 90 days. For
                 anything older, use the Historical Search tab.
               </Typography>
@@ -418,7 +421,7 @@ const Page = () => {
         />
       </CippOffCanvas>
     </>
-  )
+  );
 }
 
 Page.getLayout = (page) => (
