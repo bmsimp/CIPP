@@ -38,6 +38,7 @@ import { Layout as DashboardLayout } from "../../../../layouts/index";
 import { TabbedLayout } from "../../../../layouts/TabbedLayout";
 import { ApiGetCall } from "../../../../api/ApiCall";
 import { CippDataTable } from "../../../../components/CippTable/CippDataTable";
+import { CippApiEgressCard } from "../../../../components/CippIntegrations/CippApiEgressCard";
 import tabOptions from "./tabOptions";
 import { useTitleClaimedByTabPicker } from "../../../../layouts/tab-navigation-context";
 import {
@@ -307,6 +308,8 @@ const EgressChart = ({ data, todayBytes, capBytes, theme: t }) => {
   );
 };
 
+// The API egress view (gauge + per-client stacked trend) is the shared CippApiEgressCard, rendered below.
+
 const HeapChart = ({ data, heapCapMb, eventMarkers, theme: t }) => {
   const peak = data.reduce((max, d) => (d.Heap != null && d.Heap > max ? d.Heap : max), 0);
   const domainMax = Math.max(heapCapMb || 0, peak) * 1.05;
@@ -391,6 +394,7 @@ const Page = () => {
     data: { Action: "Timeline", Hours: String(hours) },
     queryKey: `InstanceDiagnosticsTimeline-${hours}`,
   });
+
 
   const checks = checksQuery.data?.Results ?? [];
   const buckets = useMemo(() => timelineQuery.data?.Results?.Buckets ?? [], [timelineQuery.data]);
@@ -553,6 +557,9 @@ const Page = () => {
                 />
               </>
             )}
+
+            {/* ── API egress: gauge + per-client trend (hidden when accounting is off) ── */}
+            <CippApiEgressCard />
           </Stack>
         </Container>
       </Box>
