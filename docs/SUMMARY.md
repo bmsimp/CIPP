@@ -35,7 +35,7 @@
 * [Resources](setup/resources/README.md)
   * [How CIPP Evaluates Roles](setup/resources/how-cipp-evaluates-roles.md)
   * [Professional Onboarding Services](setup/resources/professional-onboarding-services.md)
-  * [Sponsor Quick Start](setup/resources/sponsor-quick-start.md)
+  * [Subscription Quick Start](setup/resources/sponsor-quick-start.md)
 
 ## Legacy Setup (Hidden from Nav)
 
@@ -71,7 +71,7 @@
 * [Copy of Resources](legacy-setup-hidden-from-nav/resources/README.md)
   * [How CIPP Evaluates Roles](legacy-setup-hidden-from-nav/resources/how-cipp-evaluates-roles.md)
   * [Professional Onboarding Services](legacy-setup-hidden-from-nav/resources/professional-onboarding-services.md)
-  * [Sponsor Quick Start](legacy-setup-hidden-from-nav/resources/sponsor-quick-start.md)
+  * [Subscription Quick Start](legacy-setup-hidden-from-nav/resources/sponsor-quick-start.md)
 
 ## Demos
 
@@ -128,6 +128,9 @@
     * [Devices](user-documentation/identity/administration/devices.md)
     * [Deleted Items](user-documentation/identity/administration/deleted-items.md)
     * [Roles & PIM](user-documentation/identity/administration/roles/README.md)
+      * [View Individual Role](user-documentation/identity/administration/roles/role/README.md)
+        * [PIM Settings](user-documentation/identity/administration/roles/role/pim.md)
+        * [Role Audit](user-documentation/identity/administration/roles/role/audit.md)
       * [PIM Templates](user-documentation/identity/administration/roles/templates/README.md)
         * [Add PIM Template](user-documentation/identity/administration/roles/templates/add.md)
         * [Edit PIM Template](user-documentation/identity/administration/roles/templates/edit.md)
@@ -462,6 +465,7 @@
       * [Custom Domains](user-documentation/cipp/advanced/container-management/custom-domains.md)
       * [Logs](user-documentation/cipp/advanced/container-management/logs.md)
       * [Worker Health](user-documentation/cipp/advanced/container-management/worker-health.md)
+      * [Diagnostics](user-documentation/cipp/advanced/container-management/diagnostics.md)
     * [Authentication](user-documentation/cipp/advanced/authentication/README.md)
       * [CIPP Roles](user-documentation/cipp/advanced/authentication/cipp-roles/README.md)
         * [Add Role](user-documentation/cipp/advanced/authentication/cipp-roles/add.md)

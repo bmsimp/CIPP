@@ -71,6 +71,7 @@ function Invoke-CIPPDBCacheCollection {
             'AppRoleAssignments'
             'LicenseOverview'
             'ActiveUserDetail'
+            'M365AppUserDetail'
             'BitlockerKeys'
             'AdminReportSettings'
             'PeopleInsights'
@@ -183,6 +184,7 @@ function Invoke-CIPPDBCacheCollection {
             'SPOTenantSyncClientRestriction'
             'SharePointAdminSettings'
             'SharePointSiteUsage'
+            'SharePointUsageReport'
             'SiteActivity'
             'OneDriveUsage'
         )

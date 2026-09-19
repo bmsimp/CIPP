@@ -1074,6 +1074,13 @@
                   "excludeGroup": {
                     "type": "string"
                   },
+                  "ExcludeGroupIds": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string",
+                    "description": "Group ids from the deploy drawer's single-tenant picker. CustomGroup/excludeGroup still carry the display names for logging and as a fallback if the ids are ever dropped."
+                  },
                   "InstallAsSystem": {
                     "type": "string"
                   },
@@ -2214,6 +2221,13 @@
                   },
                   "excludeGroup": {
                     "type": "string"
+                  },
+                  "ExcludeGroupIds": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string",
+                    "description": "Group ids from the deploy drawer's single-tenant picker. CustomGroup/excludeGroup still carry the display names for logging and as a fallback if the ids are ever dropped."
                   },
                   "IntuneBody": {
                     "type": "string"
@@ -4429,6 +4443,15 @@
                   "defaultUseRoles": {
                     "type": "boolean"
                   },
+                  "defaultVacationCAPolicy": {
+                    "type": "string"
+                  },
+                  "defaultVacationExcludeAuditAlerts": {
+                    "type": "boolean"
+                  },
+                  "defaultVacationMode": {
+                    "type": "boolean"
+                  },
                   "generateTAPByDefault": {
                     "type": "boolean"
                   },
@@ -4563,6 +4586,13 @@
                   },
                   "excludeGroup": {
                     "type": "string"
+                  },
+                  "ExcludeGroupIds": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string",
+                    "description": "Group ids from the deploy drawer's single-tenant picker. CustomGroup/excludeGroup still carry the display names for logging and as a fallback if the ids are ever dropped."
                   },
                   "PackageName": {
                     "type": "string",
@@ -4770,6 +4800,13 @@
                   "excludeGroup": {
                     "type": "string"
                   },
+                  "ExcludeGroupIds": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string",
+                    "description": "Group ids from the deploy drawer's single-tenant picker. CustomGroup/excludeGroup still carry the display names for logging and as a fallback if the ids are ever dropped."
+                  },
                   "IntuneBody": {
                     "type": "string",
                     "description": "A template saved from an existing app carries the full body: reuse it, minus the read-only properties Graph rejects on create."
@@ -4970,6 +5007,13 @@
                   },
                   "excludeGroup": {
                     "type": "string"
+                  },
+                  "ExcludeGroupIds": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string",
+                    "description": "Sent by the deploy drawer when a single tenant is selected and groups were picked by id. customGroup/excludeGroup still carry the display names for logging and as a fallback."
                   },
                   "RAWJson": {
                     "type": "string"
@@ -5850,7 +5894,7 @@
           "Security > Compliance-SensitivityLabel"
         ],
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -5858,8 +5902,15 @@
                 "properties": {
                   "PowerShellCommand": {
                     "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string",
+                    "description": "Encryption rights granted to the source tenant's own domain would follow the template into every other tenant. Swap them for %defaultdomain% so each deploy resolves to the target tenant instead."
                   }
                 },
+                "required": [
+                  "tenantFilter"
+                ],
                 "additionalProperties": true,
                 "x-cipp-passthrough": true,
                 "description": "This endpoint forwards the request body onward rather than reading a fixed set of fields. The properties listed here are the ones it is known to read; others may be accepted."
@@ -5970,6 +6021,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "isPublic": {
+                    "type": "boolean"
+                  },
                   "sensitivityLabel": {
                     "type": "string"
                   },
@@ -5977,7 +6031,12 @@
                     "type": "string"
                   },
                   "siteDesign": {
-                    "$ref": "#/components/schemas/LabelValue"
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "Optional. Only applies to the Team and Communication templates; omitted for TeamGroup."
                   },
                   "siteName": {
                     "type": "string"
@@ -6048,6 +6107,9 @@
                     "items": {
                       "type": "object",
                       "properties": {
+                        "isPublic": {
+                          "type": "string"
+                        },
                         "sensitivityLabel": {
                           "type": "string"
                         },
@@ -6055,7 +6117,8 @@
                           "type": "string"
                         },
                         "siteDesign": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Optional. Only applies to the Team and Communication templates; leave blank for TeamGroup."
                         },
                         "siteName": {
                           "type": "string"
@@ -6292,6 +6355,10 @@
                   "GUID": {
                     "type": "string"
                   },
+                  "standards": {
+                    "type": "string",
+                    "description": "Drop standards toggled on but left with no instances (empty array) - e.g. a template standard whose last selection was removed in the editor, which leaves 'standards.<Name> = []' in the form. Persisting these produces phantom 'NOT FOUND' drift entries with no template to compare against."
+                  },
                   "templateName": {
                     "type": "string"
                   },
@@ -6367,6 +6434,16 @@
                   },
                   "description": {
                     "type": "string"
+                  },
+                  "excludeGroup": {
+                    "type": "string"
+                  },
+                  "ExcludeGroupIds": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string",
+                    "description": "Group ids from the deploy drawer's single-tenant picker. CustomGroup/excludeGroup still carry the display names for logging and as a fallback if the ids are ever dropped."
                   },
                   "InstallAsSystem": {
                     "type": "boolean",
@@ -7248,6 +7325,13 @@
                     "type": "string",
                     "description": "Set-CIPPMailboxPermission takes a single level, so Full Access plus Send As means one task per level. They are separate Exchange operations anyway."
                   },
+                  "sharePointSiteRole": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "sharePointSites": {
+                    "type": "string",
+                    "description": "SharePoint site membership is scheduled instead of run inline: a freshly created account cannot be resolved on a site (ensureuser) until it has replicated to SharePoint."
+                  },
                   "sherwebLicense": {
                     "$ref": "#/components/schemas/LabelValue"
                   },
@@ -7536,6 +7620,13 @@
                   "sharedMailboxPermission": {
                     "type": "string"
                   },
+                  "sharePointSiteRole": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "sharePointSites": {
+                    "type": "string",
+                    "description": "SharePoint sites new users are added to, with one role for all of them"
+                  },
                   "state": {
                     "type": "string"
                   },
@@ -7647,6 +7738,16 @@
                   },
                   "enforceSignatureCheck": {
                     "type": "boolean"
+                  },
+                  "excludeGroup": {
+                    "type": "string"
+                  },
+                  "ExcludeGroupIds": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string",
+                    "description": "Group ids from the deploy drawer's single-tenant picker. CustomGroup/excludeGroup still carry the display names for logging and as a fallback if the ids are ever dropped."
                   },
                   "InstallAsSystem": {
                     "type": "string"
@@ -9321,6 +9422,15 @@
                     "type": "string"
                   },
                   "defaultUseRoles": {
+                    "type": "boolean"
+                  },
+                  "defaultVacationCAPolicy": {
+                    "type": "string"
+                  },
+                  "defaultVacationExcludeAuditAlerts": {
+                    "type": "boolean"
+                  },
+                  "defaultVacationMode": {
                     "type": "boolean"
                   },
                   "generateTAPByDefault": {
@@ -12261,9 +12371,6 @@
                     "ExcludeUser": {
                       "x-cipp-field-source": "storage"
                     },
-                    "GraphErrorCount": {
-                      "x-cipp-field-source": "storage"
-                    },
                     "hasAutoExtend": {
                       "x-cipp-field-source": "storage"
                     },
@@ -12715,7 +12822,7 @@
                   },
                   "MCPAllowed": {
                     "type": "string",
-                    "description": "When this client is MCP-enabled, configure its app registration as the MCP OAuth resource (host identifier URIs + v2 tokens) so the Claude connector flow can resolve it."
+                    "description": "When this client is MCP-enabled it becomes the instance's single MCP resource. Only one client may hold MCP Access at a time - the connector flow advertises exactly one app registration - so clear the flag on every other client first. This stops stale holders left behind by failed setup attempts from accumulating and one of them being advertised (see issue #619)."
                   },
                   "RemoveAppReg": {
                     "type": "boolean"
@@ -15719,7 +15826,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read"
+        "x-cipp-role": "CIPP.BreachLookup.Read"
       }
     },
     "/api/ExecBulkLicense": {
@@ -16767,19 +16874,71 @@
             }
           }
         },
-        "parameters": [
-          {
-            "name": "ID",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
             }
           },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
           {
-            "$ref": "#/components/parameters/tenantFilter"
+            "bearerAuth": []
           }
         ],
+        "x-cipp-role": "Identity.User.ReadWrite"
+      }
+    },
+    "/api/ExecClrOnPremAttributes": {
+      "post": {
+        "summary": "ExecClrOnPremAttributes",
+        "operationId": "ExecClrOnPremAttributes",
+        "tags": [
+          "Identity > Administration > Users"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Attributes": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/LabelValue"
+                    },
+                    "description": "On-premises attributes to clear (onPremisesImmutableId, onPremisesDistinguishedName, ...), as plain names or {label,value} objects. Omit to clear every clearable attribute."
+                  },
+                  "ID": {
+                    "type": "string",
+                    "description": "Object ID of the cloud-only user whose on-premises attributes should be cleared"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success",
@@ -17022,7 +17181,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.ReadWrite",
+        "x-cipp-role": "CIPP.TemplateLibrary.ReadWrite",
         "x-cipp-any-tenant": true
       }
     },
@@ -17970,6 +18129,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "generatePwPushLink": {
+                    "type": "boolean",
+                    "description": "Opt-in: most TAPs are used directly by the admin, so the pass is returned in plain text unless the caller asks for a PwPush link. Same string-to-bool normalisation as above."
+                  },
                   "ID": {
                     "type": "string"
                   },
@@ -17996,6 +18159,15 @@
           }
         },
         "parameters": [
+          {
+            "name": "generatePwPushLink",
+            "in": "query",
+            "description": "Opt-in: most TAPs are used directly by the admin, so the pass is returned in plain text unless the caller asks for a PwPush link. Same string-to-bool normalisation as above.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
           {
             "name": "ID",
             "in": "query",
@@ -21051,9 +21223,6 @@
                     "ExcludeUser": {
                       "x-cipp-field-source": "storage,frontend"
                     },
-                    "GraphErrorCount": {
-                      "x-cipp-field-source": "storage"
-                    },
                     "hasAutoExtend": {
                       "x-cipp-field-source": "storage"
                     },
@@ -22593,7 +22762,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.ReadWrite"
+        "x-cipp-role": "CIPP.ReportBuilder.ReadWrite"
       }
     },
     "/api/ExecGeoIPLookup": {
@@ -23904,7 +24073,7 @@
         "tags": [
           "Email-Exchange > Tools"
         ],
-        "description": "Enables or disables Microsoft Purview Message Encryption for a tenant by setting AzureRMSLicensingEnabled and the Outlook Encrypt button by setting SimplifiedClientAccessEnabled, or runs Test-IRMConfiguration to verify that encryption and decryption work end to end.",
+        "description": "Updates the Microsoft Purview Message Encryption configuration for a tenant (AzureRMSLicensingEnabled, SimplifiedClientAccessEnabled, EnablePdfEncryption, DecryptAttachmentForEncryptOnly, SimplifiedClientAccessDoNotForwardDisabled, SimplifiedClientAccessEncryptOnlyDisabled, TransportDecryptionSetting; only the settings present in the body are changed), or runs Test-IRMConfiguration to verify that encryption and decryption work end to end.",
         "requestBody": {
           "required": true,
           "content": {
@@ -23919,20 +24088,16 @@
                       "Test"
                     ]
                   },
-                  "AzureRMSLicensingEnabled": {
-                    "type": "string"
-                  },
                   "Recipient": {
                     "type": "string"
                   },
                   "Sender": {
                     "type": "string"
                   },
-                  "SimplifiedClientAccessEnabled": {
-                    "type": "string",
-                    "description": "Only touch the Encrypt button setting when the caller sent it, so an API client that posts just AzureRMSLicensingEnabled does not silently disable it."
-                  },
                   "tenantFilter": {
+                    "type": "string"
+                  },
+                  "TransportDecryptionSetting": {
                     "type": "string"
                   }
                 },
@@ -28282,6 +28447,9 @@
                   },
                   "standardsExcludeAllTenants": {
                     "type": "boolean"
+                  },
+                  "tenantGroups": {
+                    "type": "string"
                   }
                 }
               }
@@ -28333,6 +28501,9 @@
                     "Status": {
                       "x-cipp-field-source": "storage,backend"
                     },
+                    "TenantGroups": {
+                      "x-cipp-field-source": "storage,backend"
+                    },
                     "Timestamp": {
                       "type": "string",
                       "x-cipp-field-source": "storage"
@@ -28382,7 +28553,10 @@
                     "type": "string"
                   },
                   "UserPrincipalName": {
-                    "type": "string"
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 },
                 "required": [
@@ -30470,9 +30644,6 @@
                     "ExcludeUser": {
                       "x-cipp-field-source": "storage"
                     },
-                    "GraphErrorCount": {
-                      "x-cipp-field-source": "storage"
-                    },
                     "hasAutoExtend": {
                       "x-cipp-field-source": "storage"
                     },
@@ -30716,7 +30887,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.ReadWrite"
+        "x-cipp-role": "CIPP.ReportBuilder.ReadWrite"
       }
     },
     "/api/ExecReprocessUserLicenses": {
@@ -34894,7 +35065,7 @@
         "tags": [
           "Teams-Sharepoint"
         ],
-        "description": "Adds or removes a user in a SharePoint site role (Owners, Members or Visitors).\nGroup-connected sites manage Owners/Members through the backing M365 group via Graph;\nVisitors (and classic/communication sites entirely) are managed through the site's\nassociated SharePoint role groups via the SharePoint REST API using certificate\nauthentication. Removals sourced from ListSiteMembers carry the group and type of the\nselected entry, so users directly added to a role group on a group-connected site are\nremoved from that group rather than from the M365 group.",
+        "description": "Adds one or more users to, or removes a user from, a SharePoint site role (Owners, Members or Visitors).\nGroup-connected sites manage Owners/Members through the backing M365 group via Graph;\nVisitors (and classic/communication sites entirely) are managed through the site's\nassociated SharePoint role groups via the SharePoint REST API using certificate\nauthentication. Removals sourced from ListSiteMembers carry the group and type of the\nselected entry, so users directly added to a role group on a group-connected site are\nremoved from that group rather than from the M365 group.",
         "requestBody": {
           "required": true,
           "content": {
@@ -34909,8 +35080,7 @@
                     "type": "string"
                   },
                   "Role": {
-                    "type": "string",
-                    "description": "Role comes from the removal picker's selected entry when present, else from the form."
+                    "type": "string"
                   },
                   "SharePointType": {
                     "type": "string"
@@ -34919,8 +35089,7 @@
                     "type": "string"
                   },
                   "URL": {
-                    "type": "string",
-                    "description": "SharePoint role group management via REST with certificate auth."
+                    "type": "string"
                   },
                   "user": {
                     "type": "object",
@@ -34929,28 +35098,21 @@
                         "type": "object",
                         "properties": {
                           "Group": {
-                            "type": "string",
-                            "description": "Role comes from the removal picker's selected entry when present, else from the form."
+                            "type": "string"
                           },
                           "Type": {
                             "type": "string"
                           }
-                        },
-                        "description": "Role comes from the removal picker's selected entry when present, else from the form."
+                        }
                       },
                       "value": {
                         "type": "string"
                       }
-                    },
-                    "required": [
-                      "value"
-                    ],
-                    "description": "Role comes from the removal picker's selected entry when present, else from the form."
+                    }
                   }
                 },
                 "required": [
-                  "tenantFilter",
-                  "URL"
+                  "tenantFilter"
                 ]
               }
             }
@@ -37710,7 +37872,7 @@
         "tags": [
           "CIPP > Core"
         ],
-        "description": "Returns the CIPP dashboard banner notifications: any hosted maintenance notice, today's most recent entries from the alert log, and warnings for an out-of-date or misconfigured deployment.",
+        "description": "Returns the CIPP dashboard banner notifications: any hosted maintenance notice, a legacy infrastructure warning for instances still on Function Apps, today's most recent entries from the alert log, and warnings for an out-of-date or misconfigured deployment.",
         "parameters": [
           {
             "name": "localversion",
@@ -38884,6 +39046,58 @@
           }
         ],
         "x-cipp-role": "Endpoint.Autopilot.Read"
+      }
+    },
+    "/api/ListApiEgress": {
+      "get": {
+        "summary": "ListApiEgress",
+        "operationId": "ListApiEgress",
+        "tags": [
+          "CIPP > Settings"
+        ],
+        "description": "Per-API-client egress usage for this instance against the daily cap. Reads the\nCraftEgressAccounting table that the Craft runtime mirrors its egress accounting into (the same\nstorage account, so this reads it directly): a per-day audit row per client plus an instance\ntotal, and 15-minute buckets for the trend. Returns today's instance summary (used-of-cap,\nenforcing, when the cap was first hit, how many requests were shed), the per-client breakdown,\nand the last-24h instance trend. When the table has no data for today - accounting off, a\nnon-hosted instance, or simply no app-only traffic yet - Enabled is false and the UI hides the\ncard. SuperAdmin only.",
+        "parameters": [
+          {
+            "name": "Hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "CIPP.SuperAdmin.Read",
+        "x-cipp-any-tenant": true
       }
     },
     "/api/ListApiTest": {
@@ -41240,7 +41454,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read",
+        "x-cipp-role": "CIPP.BreachLookup.Read",
         "x-cipp-any-tenant": true
       }
     },
@@ -41315,7 +41529,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read"
+        "x-cipp-role": "CIPP.BreachLookup.Read"
       }
     },
     "/api/ListCalendarPermissions": {
@@ -42070,7 +42284,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read",
+        "x-cipp-role": "CIPP.TemplateLibrary.Read",
         "x-cipp-any-tenant": true
       }
     },
@@ -42136,7 +42350,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read",
+        "x-cipp-role": "CIPP.TemplateLibrary.Read",
         "x-cipp-any-tenant": true
       }
     },
@@ -43812,7 +44026,7 @@
         "tags": [
           "CIPP > Core"
         ],
-        "description": "Retrieves cached tenant data from the CIPP reporting database (CippReportingDB). This is the fastest\nand most efficient way to query tenant data across single or multiple tenants. The database is populated\nnightly by background cache jobs, so data is typically at most 24 hours old.\n\nRequired query parameters:\n  - tenantFilter: The tenant domain or 'AllTenants' to query all managed tenants.\n  - type: The cache collection to retrieve (e.g. Users, Groups, Mailboxes, Devices, etc.).\n          Not required when countsOnly=true.\n\nOptional query parameters:\n  - countsOnly: When 'true', returns one row per tenant per collection containing only the record\n                count and the time that collection was last cached. This reads the pre-computed\n                '<Type>-Count' rows, so it is a single table query regardless of tenant count and\n                never materializes the underlying records. Combine with tenantFilter=AllTenants to\n                get an estate-wide inventory and per-tenant cache freshness in one call. Pass a\n                type alongside it to restrict the result to a single collection.\n\nUse type=_availableTypes to discover which cache collections exist for a given tenant. Omitting the\ntype parameter also returns the available types.\n\nPERFORMANCE GUIDANCE: For AllTenants queries or any bulk/cross-tenant data retrieval, prefer\nListDBCache over calling individual endpoints (e.g. ListUsers, ListGroups, ListMailboxes) directly.\nIndividual endpoints make live API calls per tenant which is significantly slower and may hit\nthrottling limits. ListDBCache reads pre-cached data from Azure Table Storage and returns results\nin seconds regardless of tenant count.\n\nNote that tenantFilter=AllTenants WITH a type performs a cross-partition scan and materializes every\nrecord of that collection across every tenant, so it grows with the size of the estate. Where only\ntotals are needed, countsOnly=true is dramatically cheaper and should always be preferred.\n\nRecommended workflow for MCP tool selection:\n  1. Call ListDBCache with type=_availableTypes to discover available cache collections.\n  2. If the data you need exists as a cache type, use ListDBCache with that type.\n  3. Only fall back to individual List* endpoints when you need real-time data for a single tenant\n     or when the data is not available in the cache.\n\nCommon cache types include: Users, Groups, Mailboxes, Devices, ConditionalAccess, Applications,\nIntunePolicy, CompliancePolicy, and many more. The exact set depends on what has been configured.",
+        "description": "Retrieves cached tenant data from the CIPP reporting database (CippReportingDB). This is the fastest\nand most efficient way to query tenant data across single or multiple tenants. The database is populated\nnightly by background cache jobs, so data is typically at most 24 hours old.\n\nRequired query parameters:\n  - tenantFilter: The tenant domain or 'AllTenants' to query all managed tenants.\n\nOptional query parameters:\n  - type: The cache collection to retrieve (e.g. Users, Groups, Mailboxes, Devices, etc.).\n          Omit it (or pass type=_availableTypes) to get the list of collections for the tenant\n          instead of records; it is also not needed when countsOnly=true.\n  - countsOnly: When 'true', returns one row per tenant per collection containing only the record\n                count and the time that collection was last cached. This reads the pre-computed\n                '<Type>-Count' rows, so it is a single table query regardless of tenant count and\n                never materializes the underlying records. Combine with tenantFilter=AllTenants to\n                get an estate-wide inventory and per-tenant cache freshness in one call. Pass a\n                type alongside it to restrict the result to a single collection.\n  - select: Comma-separated list of top-level fields to keep on each record (e.g.\n            select=id,displayName,userPrincipalName). Everything else is dropped during parse,\n            shrinking the response. A kept field keeps its ENTIRE subtree, so select=conditions\n            keeps conditions.users.includeRoles too; projection never reaches inside a kept\n            value. The owning Tenant is always stamped on each record regardless of select.\n  - top: Return at most this many records. For tenantFilter=AllTenants this is a GLOBAL cap\n         across all tenants when ungrouped, so use it to sample rather than to page. When\n         groupBy=Tenant is also set, top instead caps the records within each tenant bucket.\n  - latestOnly: When 'true', keep only the newest record per tenant, ranked by dateField (or\n                an auto-detected date field such as createdDateTime). Collapses per-day\n                snapshot types like SecureScore to one current row per tenant.\n  - groupBy: Set to 'Tenant' to return one bucket per tenant as\n             { Tenant, Count, Records } objects instead of a flat record list.\n  - dateField: The record field latestOnly ranks by. Omit to auto-detect.\n\nUse type=_availableTypes to discover which cache collections exist for a given tenant. Omitting the\ntype parameter also returns the available types.\n\nPERFORMANCE GUIDANCE: For AllTenants queries or any bulk/cross-tenant data retrieval, prefer\nListDBCache over calling individual endpoints (e.g. ListUsers, ListGroups, ListMailboxes) directly.\nIndividual endpoints make live API calls per tenant which is significantly slower and may hit\nthrottling limits. ListDBCache reads pre-cached data from Azure Table Storage and returns results\nin seconds regardless of tenant count.\n\nNote that tenantFilter=AllTenants WITH a type performs a cross-partition scan and materializes every\nrecord of that collection across every tenant, so it grows with the size of the estate. Where only\ntotals are needed, countsOnly=true is dramatically cheaper and should always be preferred.\n\nRecommended workflow for MCP tool selection:\n  1. Call ListDBCache with type=_availableTypes to discover available cache collections.\n  2. If the data you need exists as a cache type, use ListDBCache with that type.\n  3. Only fall back to individual List* endpoints when you need real-time data for a single tenant\n     or when the data is not available in the cache.\n\nCommon cache types include: Users, Groups, Mailboxes, Devices, ConditionalAccess, Applications,\nIntunePolicy, CompliancePolicy, and many more. The exact set depends on what has been configured.",
         "parameters": [
           {
             "name": "countsOnly",
@@ -43820,6 +44034,42 @@
             "required": false,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "dateField",
+            "in": "query",
+            "description": "The record date field latestOnly ranks by. Omit to auto-detect (createdDateTime, lastRefresh, etc).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupBy",
+            "in": "query",
+            "description": "Group the result into one bucket per tenant. Only 'Tenant' is supported.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "latestOnly",
+            "in": "query",
+            "description": "When true, keep only the newest record per tenant (by dateField, or an auto-detected date field). Collapses e.g. SecureScore's per-day snapshots to one current row per tenant.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "select",
+            "in": "query",
+            "description": "Comma-separated list of top-level fields to keep on each record; everything else is dropped during parse. A kept field keeps its ENTIRE subtree (e.g. select=conditions keeps conditions.users.includeRoles). The Tenant stamp is always preserved. Omit to return all fields.",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -43831,9 +44081,18 @@
             }
           },
           {
+            "name": "top",
+            "in": "query",
+            "description": "Return at most this many records. For AllTenants this is a global cap across all tenants, unless groupBy=Tenant is set, in which case it caps records within each tenant bucket.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
             "name": "type",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -47334,7 +47593,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read"
+        "x-cipp-role": "CIPP.ReportBuilder.Read"
       }
     },
     "/api/ListGenericTestFunction": {
@@ -49827,7 +50086,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read",
+        "x-cipp-role": "CIPP.IPDatabase.Read",
         "x-cipp-any-tenant": true
       }
     },
@@ -49861,6 +50120,12 @@
                       "AzureRMSLicensingEnabled": {
                         "x-cipp-field-source": "backend"
                       },
+                      "DecryptAttachmentForEncryptOnly": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "EnablePdfEncryption": {
+                        "x-cipp-field-source": "backend"
+                      },
                       "ExternalLicensingEnabled": {
                         "x-cipp-field-source": "backend"
                       },
@@ -49876,7 +50141,13 @@
                       "MessageEncryptionEnabled": {
                         "x-cipp-field-source": "backend"
                       },
+                      "SimplifiedClientAccessDoNotForwardDisabled": {
+                        "x-cipp-field-source": "backend"
+                      },
                       "SimplifiedClientAccessEnabled": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "SimplifiedClientAccessEncryptOnlyDisabled": {
                         "x-cipp-field-source": "backend"
                       },
                       "TransportDecryptionSetting": {
@@ -50252,7 +50523,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read",
+        "x-cipp-role": "CIPP.IPDatabase.Read",
         "x-cipp-any-tenant": true
       }
     },
@@ -50395,6 +50666,125 @@
         ],
         "x-cipp-role": "Tenant.Directory.Read",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ListLicenseRecommendations": {
+      "get": {
+        "summary": "ListLicenseRecommendations",
+        "operationId": "ListLicenseRecommendations",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "License recommendation report for a tenant: the waste tiers from ListLicenseOptimization\nplus evidence-based downgrade targets (from 90-day usage reports against the license\ncatalog), consolidation and protection upgrades, and the recommended annual/monthly\ncommitment split per SKU. Feeds the License Optimization page and the client PDF.",
+        "parameters": [
+          {
+            "name": "currency",
+            "in": "query",
+            "description": "Currency the money figures are resolved in (ISO code); defaults to USD",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inactiveDays",
+            "in": "query",
+            "description": "Sign-in / activity age in days past which a user counts as inactive (default 90)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "protectSecurityFeatures",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recommendDowngrades",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recommendTerms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recommendUpgrades",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "tenureMonths",
+            "in": "query",
+            "description": "Months a seat must have been assigned to count as stable for an annual commitment (default 6)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the columns the CIPP UI renders. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "License": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Reason": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Suggestion": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Type": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "User": {
+                        "x-cipp-field-source": "frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Directory.Read"
       }
     },
     "/api/ListLicenses": {
@@ -50576,7 +50966,7 @@
         "tags": [
           "CIPP > Core"
         ],
-        "description": "Lists CIPP platform audit logs with filtering by severity, date range, tenant, and user. Supports listing available log categories, fetching a single entry, and server-side pagination via manualPagination/nextLink.",
+        "description": "Lists CIPP platform audit logs with filtering by severity, date range, tenant, and user. Supports listing available log categories, fetching a single entry, and server-side pagination via manualPagination/nextLink. Pass Search to filter rows by a case-insensitive substring of the log Message. Pass summaryOnly=true (or countsOnly=true) to get per-API and per-severity counts across the requested range with the heavy LogData dropped, instead of the full rows.",
         "parameters": [
           {
             "name": "API",
@@ -50592,6 +50982,15 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "countsOnly",
+            "in": "query",
+            "description": "summaryOnly/countsOnly: return per-API and per-severity counts for the matching rows across the requested date range, dropping the (often huge) LogData payloads entirely. Ignores pagination.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -50681,6 +51080,15 @@
             }
           },
           {
+            "name": "Search",
+            "in": "query",
+            "description": "Free-text search over the log Message (case-insensitive literal substring). Applied client-side per partition alongside the other row filters, and independent of the Filter flag.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "Severity",
             "in": "query",
             "required": false,
@@ -50702,6 +51110,15 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "summaryOnly",
+            "in": "query",
+            "description": "summaryOnly/countsOnly: return per-API and per-severity counts for the matching rows across the requested date range, dropping the (often huge) LogData payloads entirely. Ignores pagination.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -50828,7 +51245,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read",
+        "x-cipp-role": "CIPP.Logs.Read",
         "x-cipp-any-tenant": true
       }
     },
@@ -53931,7 +54348,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "CIPP.Core.Read"
+        "x-cipp-role": "CIPP.ReportBuilder.Read"
       }
     },
     "/api/ListResellerRelationshipLink": {
@@ -56641,6 +57058,14 @@
         "description": "Retrieves SharePoint Online storage quota usage for a tenant, showing used and total storage.",
         "parameters": [
           {
+            "name": "live",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "$ref": "#/components/parameters/tenantFilter"
           }
         ],
@@ -56653,7 +57078,24 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Dashboard": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "GeoLocations": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "GeoUsedStorageMB": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Percentage": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "TenantStorageMB": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
                   }
                 }
               }
@@ -56664,6 +57106,9 @@
           },
           "403": {
             "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         },
         "security": [
@@ -57085,7 +57530,7 @@
         "tags": [
           "Identity > Reports"
         ],
-        "description": "Lists recent sign-in log entries for a tenant, filterable by various criteria. Supports AllTenants queries.",
+        "description": "Lists recent sign-in log entries for a tenant, filterable by various criteria. Supports AllTenants queries.\n\nDeprecated: use ListGraphRequest with Endpoint=auditLogs/signIns instead, which supports $filter, $top,\n$orderby, and manualPagination with nextLink continuation. This endpoint returns at most one page of\nresults and will be removed in a future release.",
         "parameters": [
           {
             "name": "Days",
@@ -60519,6 +60964,9 @@
                       "Status": {
                         "x-cipp-field-source": "storage,frontend"
                       },
+                      "TenantGroups": {
+                        "x-cipp-field-source": "storage"
+                      },
                       "Timestamp": {
                         "type": "string",
                         "x-cipp-field-source": "storage,frontend"
@@ -60554,7 +61002,7 @@
         "tags": [
           "Tenant > Administration > Tenant"
         ],
-        "description": "Lists all managed tenants accessible to the current user, with support for cache clearing and tenant filtering. This is the primary endpoint for tenant enumeration.",
+        "description": "Lists all managed tenants accessible to the current user, with support for cache clearing and tenant filtering. This is the primary endpoint for tenant enumeration. Pass Search for a fuzzy, case-insensitive substring lookup across displayName, defaultDomainName, initialDomainName and customerId when the exact domain is unknown.",
         "requestBody": {
           "required": false,
           "content": {
@@ -60600,6 +61048,15 @@
             }
           },
           {
+            "name": "Search",
+            "in": "query",
+            "description": "Fuzzy tenant lookup: case-insensitive substring match over displayName, defaultDomainName, initialDomainName and customerId. Arbitrary verified domains are not indexed by Get-Tenants and cannot be matched here. Supports '*' wildcards. Use this when you don't know the exact domain.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "TenantFilter",
             "in": "query",
             "required": false,
@@ -60610,6 +61067,7 @@
           {
             "name": "TriggerRefresh",
             "in": "query",
+            "description": "Re-reads the tenant given in tenantFilter, or queues a refresh of all tenants when omitted. Returns a Results message instead of the tenant list.",
             "required": false,
             "schema": {
               "type": "string"
@@ -60788,7 +61246,7 @@
           {
             "name": "status",
             "in": "query",
-            "description": "Narrow the scan to these statuses: Passed, Failed, Investigate, Skipped, Informational.",
+            "description": "Narrow the scan to these statuses: Passed, Failed, Investigate, Skipped, Informational and Unlicensed.",
             "required": false,
             "schema": {
               "type": "string"
@@ -60882,6 +61340,15 @@
             }
           },
           {
+            "name": "summaryOnly",
+            "in": "query",
+            "description": "When true, return only the aggregated TestCounts (per-type pass/fail/etc totals) and skip the per-result markdown/metadata enrichment and the SecureScore/MFAState/License DB reads.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "$ref": "#/components/parameters/tenantFilter"
           }
         ],
@@ -60894,7 +61361,15 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "TenantFilter": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "TestCounts": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
                   }
                 }
               }

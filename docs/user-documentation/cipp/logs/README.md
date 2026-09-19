@@ -2,6 +2,8 @@
 
 The Logbook records every action CIPP performs, whether triggered by a technician, a scheduled task, an alert, or a background process. It is the primary tool for monitoring and troubleshooting, letting you confirm that an operation ran, see why one failed, and trace what CIPP was doing at a given moment.
 
+Opening the Logbook needs the `CIPP.Logs` permission. The built-in roles all carry it, but the sign-in permission on its own does not, so a custom role must be granted it explicitly.
+
 By default the table shows entries for the current day only, newest first. Results are also scoped to the tenant currently selected in CIPP, and to the tenants your role gives you access to. Entries CIPP records against itself rather than a customer are always included.
 
 ## Using the Logbook for Troubleshooting
@@ -9,7 +11,7 @@ By default the table shows entries for the current day only, newest first. Resul
 You can verify whether a specific action occurred by checking the log entries. For example, to confirm that the scheduled task "Hudu Extension Sync" ran successfully, select the appropriate date, filter or search for `Hudu Extension Sync`, and review the entries returned.
 
 {% hint style="warning" %}
-If an expected action is not logged, it might indicate a failure that occurred before the data was collected. If an alert is expected but not present in the logbook, it could indicate a failure in the data collection process. Such issues typically require developer intervention for identification and resolution. If you are a sponsor, please reach out to the helpdesk in these cases.
+If an expected action is not logged, it might indicate a failure that occurred before the data was collected. If an alert is expected but not present in the logbook, it could indicate a failure in the data collection process. Such issues typically require developer intervention for identification and resolution. If you have an active subscription, please reach out to the helpdesk in these cases.
 {% endhint %}
 
 ## Logbook Filters
